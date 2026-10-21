@@ -4,11 +4,22 @@
   "main": "index.js",
   "license": "MIT",
   "private": true,
+  "scripts": {
+    "deploy": "pnpm --dir static/application build && forge deploy --approve MAJOR_VERSION_RULE && forge install --upgrade",
+    "test": "node --test src/*.test.js",
+    "lint": "eslint . --ext .js,.cjs --max-warnings 0",
+    "lint:fix": "pnpm lint --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
   "devDependencies": {
     "eslint": "^8.56.0",
-    "eslint-plugin-react-hooks": "^4.6.0"
+    "eslint-config-prettier": "^9.1.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "prettier": "^3.9.10"
   },
   "dependencies": {
+    "@forge/kvs": "^2.1.0",
     "@forge/resolver": "2.0.1"
   }
 }

@@ -5,6 +5,7 @@ modules:
       resolver:
         function: resolver
       title: Compass
+      layout: blank
 
   function:
     - key: resolver
@@ -12,7 +13,12 @@ modules:
 
 resources:
   - key: main
-    path: static/hello-world/build
+    path: static/application/build
+
+permissions:
+  scopes:
+    - storage:app
+    - read:jira-user
 
 app:
   runtime:
