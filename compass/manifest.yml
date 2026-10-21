@@ -1,0 +1,22 @@
+modules:
+  jira:globalPage:
+    - key: compass
+      resource: main
+      resolver:
+        function: resolver
+      title: Compass
+
+  function:
+    - key: resolver
+      handler: index.handler
+
+resources:
+  - key: main
+    path: static/hello-world/build
+
+app:
+  runtime:
+    name: nodejs24.x
+    memoryMB: 256
+    architecture: arm64
+  id: ari:cloud:ecosystem::app/66a32446-0d08-42e2-a954-b7da65b8c997
