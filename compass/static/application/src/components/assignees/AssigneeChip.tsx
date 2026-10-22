@@ -31,6 +31,17 @@ export function AssigneeAvatar({ user }: Pick<AssigneeChipProps, 'user'>) {
         .slice(0, 2)
         .join('')
         .toUpperCase();
+    function handleImageError(): void {
+        const failed = source;
+        setFailedSource(failed);
+        if (!failed || ['localhost', '127.0.0.1'].includes(window.location.hostname)) return;
+        void loadAvatar(user, true).then((freshSource) => {
+            if (freshSource && freshSource !== failed) {
+                setFailedSource(failed);
+                setSource(freshSource);
+            }
+        });
+    }
     return (
         <span className="assignee-avatar" aria-hidden="true">
             {source && failedSource !== source ? (
@@ -39,7 +50,7 @@ export function AssigneeAvatar({ user }: Pick<AssigneeChipProps, 'user'>) {
                     alt=""
                     loading="lazy"
                     referrerPolicy="no-referrer"
-                    onError={() => setFailedSource(source)}
+                    onError={handleImageError}
                 />
             ) : (
                 initials

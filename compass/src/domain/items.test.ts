@@ -250,6 +250,20 @@ test('given a Jira assignee avatar, its approved URL is persisted', () => {
     assert.deepEqual(graph.items[0].assignees, [assignee]);
 });
 
+test('given an avatar URL from another Atlassian production region, it is persisted', () => {
+    const avatarUrl =
+        'https://avatar-management--avatars.ap-southeast-2.prod.public.atl-paas.net/initials/AL-5.png';
+    const graph = validateGraph({
+        items: [
+            {
+                ...item('goal', [], 'goal'),
+                assignees: [{ accountId: 'jira-alice', displayName: 'Alice', avatarUrl }]
+            }
+        ]
+    });
+    assert.equal(graph.items[0].assignees[0].avatarUrl, avatarUrl);
+});
+
 test('given an unapproved avatar host, the assignee is rejected', () => {
     assert.throws(
         () =>

@@ -34,6 +34,12 @@ test('given a stored avatar, loading in Jira refreshes it from the account rathe
     expect(mockRequestJira).toHaveBeenCalledWith('/rest/api/3/user?accountId=jira-updated-avatar');
 });
 
+test('given an avatar from another Atlassian production region, its URL and color are preserved', () => {
+    const regionalAvatar =
+        'https://avatar-management--avatars.ap-southeast-2.prod.public.atl-paas.net/initials/AM-3.png';
+    expect(getUserAvatar({ avatarUrl: regionalAvatar })).toBe(regionalAvatar);
+});
+
 test('given the same account rendered several times, the current Jira avatar request is shared', async () => {
     mockRequestJira.mockResolvedValueOnce(avatarResponse(currentAvatar));
     const user = {
@@ -58,4 +64,19 @@ test('given an unavailable Jira user API, the saved avatar remains the fallback'
             avatarUrl: oldAvatar
         })
     ).toBe(oldAvatar);
+});
+
+test('given a failed cached avatar, refreshing the account fetches a newer URL', async () => {
+    mockRequestJira
+        .mockResolvedValueOnce(avatarResponse(oldAvatar))
+        .mockResolvedValueOnce(avatarResponse(currentAvatar));
+    const user = {
+        accountId: 'jira-avatar-retry',
+        displayName: 'Alex Morgan',
+        avatarUrl: oldAvatar
+    };
+
+    expect(await loadJiraAvatar(user)).toBe(oldAvatar);
+    expect(await loadJiraAvatar(user, true)).toBe(currentAvatar);
+    expect(mockRequestJira).toHaveBeenCalledTimes(2);
 });

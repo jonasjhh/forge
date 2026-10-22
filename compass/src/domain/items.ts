@@ -67,13 +67,19 @@ export function validateGraph(payload: unknown): Graph {
                         'avatar-management--avatars.eu-central-1.prod.public.atl-paas.net',
                         'avatar-cdn.atlassian.com'
                     ];
+                    const regionalAvatarHost =
+                        /^avatar-management--avatars\.[a-z0-9-]+\.prod\.public\.atl-paas\.net$/.test(
+                            url.hostname
+                        );
                     if (
                         typeof assignee.avatarUrl !== 'string' ||
                         assignee.avatarUrl.length > 2048 ||
                         url.protocol !== 'https:' ||
                         url.username ||
                         url.password ||
-                        (!hosts.includes(url.hostname) && !url.hostname.endsWith('.atlassian.net'))
+                        (!hosts.includes(url.hostname) &&
+                            !regionalAvatarHost &&
+                            !url.hostname.endsWith('.atlassian.net'))
                     )
                         throw new Error('Invalid avatar host.');
                     avatarUrl = url.href;

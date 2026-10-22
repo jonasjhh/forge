@@ -21,6 +21,14 @@ const avatarHosts = [
 
 const avatarRequests = new Map<string, Promise<string | null>>();
 
+function isApprovedAvatarHost(hostname: string): boolean {
+    return (
+        avatarHosts.includes(hostname) ||
+        /^avatar-management--avatars\.[a-z0-9-]+\.prod\.public\.atl-paas\.net$/.test(hostname) ||
+        hostname.endsWith('.atlassian.net')
+    );
+}
+
 export function getUserAvatar(
     user: Partial<Assignee> & { avatarUrls?: Record<string, string> }
 ): string | null {
@@ -31,7 +39,7 @@ export function getUserAvatar(
         return url.protocol === 'https:' &&
             !url.username &&
             !url.password &&
-            (avatarHosts.includes(url.hostname) || url.hostname.endsWith('.atlassian.net'))
+            isApprovedAvatarHost(url.hostname)
             ? url.href
             : null;
     } catch {
@@ -39,7 +47,7 @@ export function getUserAvatar(
     }
 }
 
-export async function loadAvatar(user: Assignee): Promise<string | null> {
+export async function loadAvatar(user: Assignee, refresh = false): Promise<string | null> {
     if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
         const provided = getUserAvatar(user);
         if (provided) return provided;
@@ -51,11 +59,12 @@ export async function loadAvatar(user: Assignee): Promise<string | null> {
             .join('');
         return `https://${avatarHosts[0]}/initials/${encodeURIComponent(initials)}-5.png`;
     }
-    return loadJiraAvatar(user);
+    return loadJiraAvatar(user, refresh);
 }
 
-export async function loadJiraAvatar(user: Assignee): Promise<string | null> {
+export async function loadJiraAvatar(user: Assignee, refresh = false): Promise<string | null> {
     const provided = getUserAvatar(user);
+    if (refresh) avatarRequests.delete(user.accountId);
     if (!avatarRequests.has(user.accountId)) {
         avatarRequests.set(
             user.accountId,

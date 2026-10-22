@@ -24,9 +24,7 @@ permissions:
       - unsafe-inline
   external:
     images:
-      - address: https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net
-      - address: https://avatar-management--avatars.us-east-1.prod.public.atl-paas.net
-      - address: https://avatar-management--avatars.eu-central-1.prod.public.atl-paas.net
+      - address: '*.prod.public.atl-paas.net'
       - address: https://avatar-cdn.atlassian.com
       - address: '*.atlassian.net'
 
