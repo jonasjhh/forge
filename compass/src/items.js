@@ -45,9 +45,34 @@ export function validateGraph(payload) {
             ) {
                 throw new Error('Every assignee needs a Jira account ID and display name.');
             }
+            let avatarUrl;
+            if (assignee.avatarUrl) {
+                try {
+                    const url = new URL(assignee.avatarUrl);
+                    const hosts = [
+                        'avatar-management--avatars.us-west-2.prod.public.atl-paas.net',
+                        'avatar-management--avatars.us-east-1.prod.public.atl-paas.net',
+                        'avatar-management--avatars.eu-central-1.prod.public.atl-paas.net',
+                        'avatar-cdn.atlassian.com'
+                    ];
+                    if (
+                        typeof assignee.avatarUrl !== 'string' ||
+                        assignee.avatarUrl.length > 2048 ||
+                        url.protocol !== 'https:' ||
+                        url.username ||
+                        url.password ||
+                        (!hosts.includes(url.hostname) && !url.hostname.endsWith('.atlassian.net'))
+                    )
+                        throw new Error('Invalid avatar host.');
+                    avatarUrl = url.href;
+                } catch {
+                    throw new Error('Avatar images must use an approved Atlassian HTTPS host.');
+                }
+            }
             return {
                 accountId: assignee.accountId.trim(),
-                displayName: assignee.displayName.trim()
+                displayName: assignee.displayName.trim(),
+                ...(avatarUrl ? { avatarUrl } : {})
             };
         });
         if (

@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { LoaderCircle, Plus, UserRound, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ChevronDown, LoaderCircle, Plus, UsersRound } from 'lucide-react';
+import AssigneeChip, { AssigneeAvatar, getUserAvatar } from './AssigneeChip';
 
 const previewUsers = [
     { accountId: 'preview-alex', displayName: 'Alex Morgan' },
@@ -21,10 +22,23 @@ async function searchUsers(query) {
     const users = await response.json();
     return users
         .filter((user) => user.active && user.accountType !== 'app')
-        .map((user) => ({ accountId: user.accountId, displayName: user.displayName }));
+        .map((user) => ({
+            accountId: user.accountId,
+            displayName: user.displayName,
+            ...(getUserAvatar(user) ? { avatarUrl: getUserAvatar(user) } : {})
+        }));
 }
 
-export function AssigneePicker({ value, onChange, disabled, id }) {
+export function AssigneePicker({
+    value,
+    onChange,
+    disabled,
+    id,
+    options,
+    label = 'Assignees',
+    placeholder = 'Search Jira users',
+    maxSelections = 20
+}) {
     const [query, setQuery] = useState('');
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -37,6 +51,15 @@ export function AssigneePicker({ value, onChange, disabled, id }) {
         setError('');
         setSearched(false);
         setLoading(false);
+        if (options !== undefined) {
+            setUsers(
+                options.filter((user) =>
+                    user.displayName.toLowerCase().includes(query.trim().toLowerCase())
+                )
+            );
+            setSearched(true);
+            return;
+        }
         if (query.trim().length < 2) return;
         setLoading(true);
         const timer = setTimeout(() => {
@@ -61,7 +84,7 @@ export function AssigneePicker({ value, onChange, disabled, id }) {
             cancelled = true;
             clearTimeout(timer);
         };
-    }, [query]);
+    }, [query, options]);
 
     const available = users.filter(
         (user) => !value.some((assignee) => assignee.accountId === user.accountId)
@@ -69,41 +92,36 @@ export function AssigneePicker({ value, onChange, disabled, id }) {
     return (
         <div className="assignee-picker">
             <label htmlFor={id}>
-                Assignees <span className="count">{value.length}</span>
+                {label} <span className="count">{value.length}</span>
             </label>
-            <ul className="assignee-list">
-                {value.map((user) => (
-                    <li key={user.accountId}>
-                        <UserRound size={14} />
-                        <span>{user.displayName}</span>
-                        <button
-                            className="icon-button"
-                            type="button"
-                            aria-label={`Remove assignee ${user.displayName}`}
-                            title={`Remove ${user.displayName}`}
-                            disabled={disabled}
-                            onClick={() =>
-                                onChange(
-                                    value.filter(
-                                        (assignee) => assignee.accountId !== user.accountId
+            <div className="assignee-control">
+                <ul className="assignee-list">
+                    {value.map((user) => (
+                        <li key={user.accountId}>
+                            <AssigneeChip
+                                user={user}
+                                disabled={disabled}
+                                onRemove={() =>
+                                    onChange(
+                                        value.filter(
+                                            (assignee) => assignee.accountId !== user.accountId
+                                        )
                                     )
-                                )
-                            }
-                        >
-                            <X size={14} />
-                        </button>
-                    </li>
-                ))}
-            </ul>
-            <input
-                id={id}
-                type="search"
-                placeholder="Search Jira users"
-                autoComplete="off"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                disabled={disabled || value.length >= 20}
-            />
+                                }
+                            />
+                        </li>
+                    ))}
+                </ul>
+                <input
+                    id={id}
+                    type="search"
+                    placeholder={placeholder}
+                    autoComplete="off"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    disabled={disabled || value.length >= maxSelections}
+                />
+            </div>
             {loading && (
                 <p className="picker-status" role="status">
                     <LoaderCircle size={14} className="spin" />
@@ -121,17 +139,17 @@ export function AssigneePicker({ value, onChange, disabled, id }) {
                 </p>
             )}
             <ul className="user-results">
-                {available.map((user) => (
+                {available.slice(0, options === undefined ? 20 : 30).map((user) => (
                     <li key={user.accountId}>
                         <button
                             type="button"
-                            disabled={disabled || value.length >= 20}
+                            disabled={disabled || value.length >= maxSelections}
                             onClick={() => {
                                 onChange([...value, user]);
                                 setQuery('');
                             }}
                         >
-                            <UserRound size={15} />
+                            <AssigneeAvatar user={user} />
                             <span>{user.displayName}</span>
                             <Plus size={15} />
                         </button>
@@ -139,6 +157,63 @@ export function AssigneePicker({ value, onChange, disabled, id }) {
                 ))}
             </ul>
         </div>
+    );
+}
+
+export function AssigneeFilter({ users, value, onChange }) {
+    const details = useRef(null);
+    const [open, setOpen] = useState(false);
+    useEffect(() => {
+        const closeOutside = (event) => {
+            if (details.current && !details.current.contains(event.target))
+                details.current.open = false;
+        };
+        document.addEventListener('pointerdown', closeOutside);
+        return () => document.removeEventListener('pointerdown', closeOutside);
+    }, []);
+    return (
+        <details
+            ref={details}
+            className="assignee-filter"
+            onToggle={(event) => setOpen(event.currentTarget.open)}
+            onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                    event.currentTarget.open = false;
+                    event.currentTarget.querySelector('summary').focus();
+                }
+            }}
+        >
+            <summary
+                className={`button secondary ${value.length ? 'filter-active' : ''}`}
+                aria-label="Filter by assignee"
+            >
+                <UsersRound size={16} />
+                <span>Assignees</span>
+                {value.length > 0 && <span className="count">{value.length}</span>}
+                <ChevronDown size={14} />
+            </summary>
+            {open && (
+                <div className="assignee-filter-panel" role="group" aria-label="Assignee filter">
+                    <AssigneePicker
+                        id="filter-assignees"
+                        label="Filter by assignee"
+                        placeholder="Search assignees"
+                        options={users}
+                        value={value}
+                        onChange={onChange}
+                        maxSelections={Infinity}
+                    />
+                    <button
+                        type="button"
+                        className="button secondary clear-assignee-filter"
+                        disabled={!value.length}
+                        onClick={() => onChange([])}
+                    >
+                        Clear all
+                    </button>
+                </div>
+            )}
+        </details>
     );
 }
 

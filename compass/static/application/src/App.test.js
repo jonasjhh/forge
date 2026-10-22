@@ -4,7 +4,289 @@ import { act, Simulate } from 'react-dom/test-utils';
 import { Network } from 'vis-network/standalone';
 import App from './App';
 import ItemGraph from './ItemGraph';
-import { buildListRows, moveGoalToFolder } from './entries';
+import AssigneeChip, { getUserAvatar } from './AssigneeChip';
+import { buildListRows, matchesAssignees, moveGoalToFolder, moveListEntry } from './entries';
+
+test('given several selected assignees, entries matching any selected account are included', () => {
+    const alice = { accountId: 'alice', displayName: 'Alice' };
+    const bob = { accountId: 'bob', displayName: 'Bob' };
+    const entries = [
+        { id: 'alice-goal', assignees: [alice] },
+        { id: 'bob-goal', assignees: [bob] },
+        { id: 'other', assignees: [{ accountId: 'other', displayName: 'Alice' }] },
+        { id: 'unassigned', assignees: [] }
+    ];
+    expect(
+        entries.filter((entry) => matchesAssignees(entry, [alice, bob])).map((entry) => entry.id)
+    ).toEqual(['alice-goal', 'bob-goal']);
+    expect(entries.filter((entry) => matchesAssignees(entry, [])).map((entry) => entry.id)).toEqual(
+        ['alice-goal', 'bob-goal', 'other', 'unassigned']
+    );
+});
+
+test('given the assignee filter, selecting people uses OR matching and clear all restores unrelated rows', async () => {
+    const alice = { accountId: 'preview-alice', displayName: 'Alice' };
+    const bob = { accountId: 'preview-bob', displayName: 'Bob' };
+    localStorage.setItem(
+        'compass-preview-v1',
+        JSON.stringify({
+            items: [
+                {
+                    id: 'folder',
+                    type: 'folder',
+                    name: 'Strategy',
+                    description: '',
+                    childIds: ['parent', 'unrelated'],
+                    assignees: []
+                },
+                {
+                    id: 'parent',
+                    type: 'goal',
+                    name: 'Parent',
+                    description: '',
+                    childIds: ['metric'],
+                    assignees: []
+                },
+                {
+                    id: 'metric',
+                    type: 'metric',
+                    name: 'Assigned metric',
+                    description: '',
+                    childIds: [],
+                    assignees: [alice]
+                },
+                {
+                    id: 'bob-goal',
+                    type: 'goal',
+                    name: 'Bob goal',
+                    description: '',
+                    childIds: [],
+                    assignees: [bob]
+                },
+                {
+                    id: 'unrelated',
+                    type: 'goal',
+                    name: 'Unrelated',
+                    description: '',
+                    childIds: [],
+                    assignees: []
+                }
+            ],
+            updatedAt: null
+        })
+    );
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    act(() => {
+        const filter = container.querySelector('.assignee-filter');
+        filter.open = true;
+        Simulate.toggle(filter);
+    });
+    await act(async () => {
+        Simulate.click(
+            [...container.querySelectorAll('.assignee-filter .user-results button')].find(
+                (button) => button.textContent.endsWith('Alice')
+            )
+        );
+    });
+    expect([...container.querySelectorAll('.entry-row')].map((row) => row.dataset.entryId)).toEqual(
+        ['folder', 'parent', 'metric']
+    );
+    expect(container.querySelector('.connection-count').textContent).toBe('1 match');
+    await act(async () => {
+        Simulate.click(
+            [...container.querySelectorAll('.assignee-filter .user-results button')].find(
+                (button) => button.textContent.endsWith('Bob')
+            )
+        );
+    });
+    expect([...container.querySelectorAll('.entry-row')].map((row) => row.dataset.entryId)).toEqual(
+        ['folder', 'parent', 'metric', 'bob-goal']
+    );
+    await act(async () => {
+        Simulate.click(container.querySelector('.clear-assignee-filter'));
+    });
+    expect(container.querySelector('[data-entry-id="unrelated"]')).not.toBeNull();
+    expect(container.querySelector('.column-folder')).toBeNull();
+});
+
+test('given folder editing in details, saving a new folder preserves goal-parent relationships and metrics', async () => {
+    localStorage.setItem(
+        'compass-preview-v1',
+        JSON.stringify({
+            items: [
+                {
+                    id: 'old-folder',
+                    type: 'folder',
+                    name: 'Old folder',
+                    description: '',
+                    childIds: ['goal'],
+                    assignees: []
+                },
+                {
+                    id: 'new-folder',
+                    type: 'folder',
+                    name: 'New folder',
+                    description: '',
+                    childIds: [],
+                    assignees: []
+                },
+                {
+                    id: 'parent',
+                    type: 'goal',
+                    name: 'Parent',
+                    description: '',
+                    childIds: ['goal'],
+                    assignees: []
+                },
+                {
+                    id: 'goal',
+                    type: 'goal',
+                    name: 'Shared goal',
+                    description: '',
+                    childIds: ['metric'],
+                    assignees: []
+                },
+                {
+                    id: 'metric',
+                    type: 'metric',
+                    name: 'Metric',
+                    description: '',
+                    childIds: [],
+                    assignees: []
+                }
+            ],
+            updatedAt: null
+        })
+    );
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    act(() => {
+        Simulate.click(container.querySelector('[aria-label="Open goal Shared goal"]'));
+    });
+    act(() => {
+        Simulate.change(container.querySelector('#goal-folder'), {
+            target: { value: 'new-folder' }
+        });
+    });
+    await act(async () => {
+        Simulate.submit(container.querySelector('.details > form'));
+    });
+    const saved = JSON.parse(localStorage.getItem('compass-preview-v1')).items;
+    expect(saved.find((entry) => entry.id === 'old-folder').childIds).toEqual([]);
+    expect(saved.find((entry) => entry.id === 'new-folder').childIds).toEqual(['goal']);
+    expect(saved.find((entry) => entry.id === 'parent').childIds).toEqual(['goal']);
+    expect(saved.find((entry) => entry.id === 'goal').childIds).toEqual(['metric']);
+});
+
+test('given an assignee-matched metric, all parent goals and folder ancestors remain visible without unrelated siblings', () => {
+    const alice = { accountId: 'alice', displayName: 'Alice' };
+    const items = [
+        { id: 'folder', type: 'folder', childIds: ['first', 'unrelated'], assignees: [] },
+        { id: 'first', type: 'goal', childIds: ['shared'], assignees: [] },
+        { id: 'second', type: 'goal', childIds: ['shared'], assignees: [] },
+        { id: 'shared', type: 'goal', childIds: ['metric'], assignees: [] },
+        { id: 'metric', type: 'metric', childIds: [], assignees: [alice] },
+        { id: 'unrelated', type: 'goal', childIds: [], assignees: [] }
+    ];
+    const matches = items.filter((entry) => matchesAssignees(entry, [alice]));
+    expect(buildListRows(items, matches).map((row) => row.entry.id)).toEqual([
+        'folder',
+        'first',
+        'shared',
+        'metric',
+        'second',
+        'shared',
+        'metric'
+    ]);
+});
+
+test('given sibling goals, dragging before another goal persists their child order', () => {
+    const items = [
+        { id: 'folder', type: 'folder', childIds: ['first', 'second'] },
+        { id: 'first', type: 'goal', childIds: [] },
+        { id: 'second', type: 'goal', childIds: [] }
+    ];
+    expect(moveListEntry(items, 'folder/second', 'folder/first', 'before')[0].childIds).toEqual([
+        'second',
+        'first'
+    ]);
+});
+
+test('given a shared goal, moving one occurrence preserves its other parent and metrics', () => {
+    const items = [
+        { id: 'first', type: 'goal', childIds: ['shared'] },
+        { id: 'second', type: 'goal', childIds: ['shared'] },
+        { id: 'folder', type: 'folder', childIds: [] },
+        { id: 'shared', type: 'goal', childIds: ['metric'] },
+        { id: 'metric', type: 'metric', childIds: [] }
+    ];
+    const moved = moveListEntry(items, 'first/shared', 'folder', 'inside');
+    expect(moved.find((entry) => entry.id === 'first').childIds).toEqual([]);
+    expect(moved.find((entry) => entry.id === 'second').childIds).toEqual(['shared']);
+    expect(moved.find((entry) => entry.id === 'folder').childIds).toEqual(['shared']);
+    expect(moved.find((entry) => entry.id === 'shared').childIds).toEqual(['metric']);
+});
+
+test('given a descendant drop, dragging a parent beneath its child is rejected', () => {
+    const items = [
+        { id: 'parent', type: 'goal', childIds: ['child'] },
+        { id: 'child', type: 'goal', childIds: [] }
+    ];
+    expect(() => moveListEntry(items, 'parent', 'parent/child', 'inside')).toThrow(
+        /beneath itself/
+    );
+});
+
+test('given a metric, dragging it into a folder is rejected', () => {
+    const items = [
+        { id: 'goal', type: 'goal', childIds: ['metric'] },
+        { id: 'metric', type: 'metric', childIds: [] },
+        { id: 'folder', type: 'folder', childIds: [] }
+    ];
+    expect(() => moveListEntry(items, 'goal/metric', 'folder', 'inside')).toThrow(
+        /Folders contain/
+    );
+});
+
+test('given root entries, dragging changes their saved list order', () => {
+    const items = [
+        { id: 'goal', type: 'goal', childIds: [] },
+        { id: 'folder', type: 'folder', childIds: [] }
+    ];
+    expect(moveListEntry(items, 'folder', 'goal', 'before').map((entry) => entry.id)).toEqual([
+        'folder',
+        'goal'
+    ]);
+});
+
+test('given a Jira avatar URL, the user chip shows the image and name and falls back to initials on failure', async () => {
+    const user = {
+        accountId: 'jira-alex',
+        displayName: 'Alex Morgan',
+        avatarUrl:
+            'https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/initials/AM-5.png'
+    };
+    await act(async () => {
+        ReactDOM.render(<AssigneeChip user={user} />, container);
+    });
+    expect(container.querySelector('.assignee-name').textContent).toBe('Alex Morgan');
+    expect(container.querySelector('img').src).toBe(user.avatarUrl);
+    act(() => {
+        Simulate.error(container.querySelector('img'));
+    });
+    expect(container.querySelector('.assignee-avatar').textContent).toBe('AM');
+});
+
+test('given Jira avatar metadata, only approved HTTPS image hosts are used', () => {
+    expect(
+        getUserAvatar({ avatarUrls: { '48x48': 'https://example.atlassian.net/avatar.png' } })
+    ).toBe('https://example.atlassian.net/avatar.png');
+    expect(getUserAvatar({ avatarUrl: 'https://untrusted.example/avatar.png' })).toBeNull();
+    expect(getUserAvatar({ avatarUrl: 'http://example.atlassian.net/avatar.png' })).toBeNull();
+});
 
 jest.mock('vis-network/standalone', () => ({
     Network: jest.fn()

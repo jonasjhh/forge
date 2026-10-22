@@ -8,6 +8,15 @@ export function normalizeEntry(entry) {
     return { ...entry, type: entry.type || 'folder', assignees: entry.assignees || [] };
 }
 
+export function matchesAssignees(entry, selectedAssignees) {
+    return (
+        selectedAssignees.length === 0 ||
+        entry.assignees.some((assignee) =>
+            selectedAssignees.some((selected) => selected.accountId === assignee.accountId)
+        )
+    );
+}
+
 export function canContain(parentType, childType) {
     return parentType === 'folder'
         ? ['folder', 'goal'].includes(childType)
@@ -73,11 +82,7 @@ export function buildListRows(items, entries, collapsedPaths = new Set(), maxRow
         const nextAncestors = new Set([...ancestors, entry.id]);
         children.forEach((childId) => append(byId.get(childId), depth + 1, path, nextAncestors));
     }
-    const ordered = [
-        ...items.filter((entry) => entry.type === 'folder'),
-        ...items.filter((entry) => entry.type !== 'folder')
-    ];
-    ordered
+    items
         .filter(
             (entry) =>
                 included.has(entry.id) &&
@@ -85,4 +90,54 @@ export function buildListRows(items, entries, collapsedPaths = new Set(), maxRow
         )
         .forEach((entry) => append(entry, 0, '', new Set()));
     return rows;
+}
+
+export function moveListEntry(items, sourcePath, targetPath, placement) {
+    if (!['before', 'inside', 'after'].includes(placement))
+        throw new Error('Choose a valid drop position.');
+    const sourceParts = sourcePath.split('/');
+    const targetParts = targetPath.split('/');
+    const sourceId = sourceParts[sourceParts.length - 1];
+    const targetId = targetParts[targetParts.length - 1];
+    const sourceParentId = sourceParts[sourceParts.length - 2] || null;
+    const destinationParentId =
+        placement === 'inside' ? targetId : targetParts[targetParts.length - 2] || null;
+    const source = items.find((entry) => entry.id === sourceId);
+    const target = items.find((entry) => entry.id === targetId);
+    if (!source || !target)
+        throw new Error('This entry is no longer available. Refresh the workspace.');
+    if (sourceId === targetId) return items;
+    if (targetPath.startsWith(`${sourcePath}/`))
+        throw new Error('An entry cannot be moved beneath itself.');
+    const destination = items.find((entry) => entry.id === destinationParentId);
+    if (destination) {
+        if (!canContain(destination.type, source.type))
+            throw new Error('Folders contain folders or goals; goals contain goals or metrics.');
+        if (destinationParentId !== sourceParentId && !canConnect(items, destination, source))
+            throw new Error('This move would duplicate a connection or create a cycle.');
+    } else {
+        if (source.type === 'metric') throw new Error('Metrics must stay beneath a goal.');
+        if (items.some((entry) => entry.id !== sourceParentId && entry.childIds.includes(sourceId)))
+            throw new Error(
+                'This entry still has other parents. Move it beneath another parent instead.'
+            );
+    }
+    const updated = items.map((entry) => {
+        if (entry.id !== sourceParentId && entry.id !== destinationParentId) return entry;
+        const childIds = entry.childIds.filter((id) => id !== sourceId);
+        if (entry.id === destinationParentId) {
+            const targetIndex = childIds.indexOf(targetId);
+            const insertIndex =
+                placement === 'inside'
+                    ? childIds.length
+                    : targetIndex + (placement === 'after' ? 1 : 0);
+            childIds.splice(insertIndex, 0, sourceId);
+        }
+        return { ...entry, childIds };
+    });
+    if (destination) return updated;
+    const remaining = updated.filter((entry) => entry.id !== sourceId);
+    const targetIndex = remaining.findIndex((entry) => entry.id === targetId);
+    remaining.splice(targetIndex + (placement === 'after' ? 1 : 0), 0, source);
+    return remaining;
 }

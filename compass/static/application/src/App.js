@@ -22,8 +22,16 @@ import {
 } from 'lucide-react';
 import ItemGraph from './ItemGraph';
 import GoalList from './GoalList';
-import { AssigneePicker, MetricFields } from './EntryFields';
-import { canConnect, canContain, entryTypes, moveGoalToFolder, normalizeEntry } from './entries';
+import { AssigneeFilter, AssigneePicker, MetricFields } from './EntryFields';
+import {
+    canConnect,
+    canContain,
+    entryTypes,
+    matchesAssignees,
+    moveGoalToFolder,
+    moveListEntry,
+    normalizeEntry
+} from './entries';
 import './App.css';
 
 const isPreview = ['localhost', '127.0.0.1'].includes(window.location.hostname);
@@ -53,7 +61,20 @@ function IconButton({ label, children, ...props }) {
     );
 }
 
-function ItemDetails({ item, items, busy, onSave, onSelect, onDelete, onCreate, onRelate }) {
+function ItemDetails({
+    item,
+    items,
+    busy,
+    onSave: saveEntry,
+    onSelect,
+    onDelete,
+    onCreate,
+    onRelate
+}) {
+    const currentFolderId =
+        items.find((entry) => entry.type === 'folder' && entry.childIds.includes(item.id))?.id ||
+        '';
+    const [folderId, setFolderId] = useState(currentFolderId);
     const [name, setName] = useState(item.name);
     const [description, setDescription] = useState(item.description);
     const [assignees, setAssignees] = useState(item.assignees);
@@ -75,7 +96,15 @@ function ItemDetails({ item, items, busy, onSave, onSelect, onDelete, onCreate, 
         });
         setTarget('');
         setParentTarget('');
-    }, [item]);
+        setFolderId(currentFolderId);
+    }, [item, currentFolderId]);
+
+    function onSave(updated) {
+        return saveEntry(
+            updated,
+            item.type === 'goal' && folderId !== currentFolderId ? folderId : undefined
+        );
+    }
 
     const candidates = items.filter((candidate) => canConnect(items, item, candidate));
     const parents = items.filter(
@@ -93,7 +122,7 @@ function ItemDetails({ item, items, busy, onSave, onSelect, onDelete, onCreate, 
         assignees,
         ...(item.type === 'metric' ? metric : {})
     };
-    const changed = JSON.stringify(draft) !== JSON.stringify(item);
+    const changed = JSON.stringify(draft) !== JSON.stringify(item) || folderId !== currentFolderId;
     const typeLabel =
         item.type === 'goal' && parents.some((parent) => parent.type === 'goal')
             ? 'Sub-goal'
@@ -137,6 +166,26 @@ function ItemDetails({ item, items, busy, onSave, onSelect, onDelete, onCreate, 
                     maxLength={500}
                     disabled={busy}
                 />
+                {item.type === 'goal' && (
+                    <React.Fragment>
+                        <label htmlFor="goal-folder">Folder</label>
+                        <select
+                            id="goal-folder"
+                            value={folderId}
+                            disabled={busy}
+                            onChange={(event) => setFolderId(event.target.value)}
+                        >
+                            <option value="">No direct folder</option>
+                            {items
+                                .filter((entry) => entry.type === 'folder')
+                                .map((folder) => (
+                                    <option key={folder.id} value={folder.id}>
+                                        {folder.name}
+                                    </option>
+                                ))}
+                        </select>
+                    </React.Fragment>
+                )}
                 {item.type === 'metric' && (
                     <MetricFields
                         value={metric}
@@ -550,6 +599,7 @@ function App() {
     const [createType, setCreateType] = useState('folder');
     const [createParentId, setCreateParentId] = useState('');
     const [typeFilter, setTypeFilter] = useState('all');
+    const [assigneeFilter, setAssigneeFilter] = useState([]);
     const [reload, setReload] = useState(0);
     const graph = useRef(null);
     const saving = useRef(false);
@@ -606,12 +656,20 @@ function App() {
     const visibleItems = items.filter(
         (item) =>
             (typeFilter === 'all' || item.type === typeFilter) &&
+            matchesAssignees(item, assigneeFilter) &&
             `${item.name} ${item.description} ${item.assignees.map((user) => user.displayName).join(' ')}`
                 .toLowerCase()
                 .includes(search.toLowerCase())
     );
     const relationshipItems = items.filter((item) => item.type !== 'folder');
+    const filtered = assigneeFilter.length > 0 || typeFilter !== 'all' || search.length > 0;
+    const listCountLabel = `${visibleItems.length} ${filtered ? (visibleItems.length === 1 ? 'match' : 'matches') : visibleItems.length === 1 ? 'entry' : 'entries'}`;
     const connections = relationshipItems.reduce((total, item) => total + item.childIds.length, 0);
+    const workspaceAssignees = [
+        ...new Map(
+            items.flatMap((item) => item.assignees).map((user) => [user.accountId, user])
+        ).values()
+    ].sort((first, second) => first.displayName.localeCompare(second.displayName));
 
     function openCreate(type, parentId = '') {
         setCreateType(type);
@@ -629,7 +687,7 @@ function App() {
                     <div>
                         <h1>Compass</h1>
                         <span className="workspace-label">
-                            {isPreview ? 'LOCAL PREVIEW' : 'SHARED WORKSPACE'}
+                            {isPreview ? 'Local preview' : 'Shared workspace'}
                         </span>
                     </div>
                 </div>
@@ -654,7 +712,7 @@ function App() {
                         }
                         onClick={() => openCreate('folder')}
                     >
-                        <Plus size={17} />
+                        <Folder size={17} />
                         New folder
                     </button>
                     <button
@@ -715,9 +773,7 @@ function App() {
                         </div>
                         <div className="view-toolbar-actions">
                             <span className="connection-count">
-                                {mode === 'list'
-                                    ? `${visibleItems.length} entries`
-                                    : `${connections} relationships`}
+                                {mode === 'list' ? listCountLabel : `${connections} relationships`}
                             </span>
                             <IconButton
                                 label="Refresh workspace"
@@ -753,6 +809,11 @@ function App() {
                                         <option value="goal">Goals</option>
                                         <option value="metric">Metrics</option>
                                     </select>
+                                    <AssigneeFilter
+                                        users={workspaceAssignees}
+                                        value={assigneeFilter}
+                                        onChange={setAssigneeFilter}
+                                    />
                                 </div>
                             </div>
                             {loading ? (
@@ -767,8 +828,10 @@ function App() {
                                     selectedId={selectedId}
                                     busy={busy}
                                     onSelect={setSelectedId}
-                                    onMove={(goalId, folderId) =>
-                                        save(moveGoalToFolder(items, goalId, folderId))
+                                    onRearrange={(sourcePath, targetPath, placement) =>
+                                        save(
+                                            moveListEntry(items, sourcePath, targetPath, placement)
+                                        )
                                     }
                                 />
                             )}
@@ -847,9 +910,16 @@ function App() {
                         item={selected}
                         items={items}
                         busy={busy || loading}
-                        onSave={(updated) =>
-                            save(items.map((item) => (item.id === updated.id ? updated : item)))
-                        }
+                        onSave={(updated, folderId) => {
+                            const nextItems = items.map((item) =>
+                                item.id === updated.id ? updated : item
+                            );
+                            return save(
+                                folderId === undefined
+                                    ? nextItems
+                                    : moveGoalToFolder(nextItems, updated.id, folderId)
+                            );
+                        }}
                         onSelect={setSelectedId}
                         onDelete={() => setDialog('delete')}
                         onCreate={(type) => openCreate(type, selected.id)}

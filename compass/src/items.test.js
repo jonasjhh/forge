@@ -233,6 +233,40 @@ test('given a standalone goal with no metrics, it is accepted without a folder o
     assert.deepEqual(validateGraph(graph), graph);
 });
 
+test('given a Jira assignee avatar, its approved URL is persisted', () => {
+    const assignee = {
+        accountId: 'jira-alice',
+        displayName: 'Alice',
+        avatarUrl:
+            'https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/initials/AL-5.png'
+    };
+    const graph = validateGraph({
+        items: [{ ...item('goal', [], 'goal'), assignees: [assignee] }]
+    });
+    assert.deepEqual(graph.items[0].assignees, [assignee]);
+});
+
+test('given an unapproved avatar host, the assignee is rejected', () => {
+    assert.throws(
+        () =>
+            validateGraph({
+                items: [
+                    {
+                        ...item('goal', [], 'goal'),
+                        assignees: [
+                            {
+                                accountId: 'jira-alice',
+                                displayName: 'Alice',
+                                avatarUrl: 'https://untrusted.example/avatar.png'
+                            }
+                        ]
+                    }
+                ]
+            }),
+        /approved Atlassian HTTPS host/
+    );
+});
+
 test('given a shared nested goal and multiple metrics, every parent relationship is accepted', () => {
     const graph = {
         items: [
