@@ -14,6 +14,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "typecheck": "tsc --noEmit",
     "test": "react-scripts test --watchAll=false",
     "build": "react-scripts build",
     "eject": "react-scripts eject"
@@ -31,6 +32,11 @@
     ]
   },
   "devDependencies": {
-    "react-scripts": "^5.0.1"
+    "@types/jest": "~27.5.2",
+    "@types/node": "~18.19.130",
+    "@types/react": "~16.14.70",
+    "@types/react-dom": "~16.9.25",
+    "react-scripts": "^5.0.1",
+    "typescript": "4.9.5"
   }
 }

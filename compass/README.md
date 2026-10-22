@@ -21,6 +21,30 @@ pnpm --dir static/application install
 
 Edit the frontend in `static/application/src/`.
 
+## Source Structure
+
+Application source and tests use strict TypeScript. The Forge handler remains `index.handler`; its implementation is now `src/index.ts`.
+
+```text
+shared/workspace.ts                 Shared data and resolver contracts
+src/index.ts                        Forge resolver adapter
+src/domain/                         Backend validation, ownership, and tests
+static/application/src/
+	app/                              App state, composition, and layout styles
+	components/ui/                    Reusable buttons and control styles
+	components/assignees/              Reusable avatar, chip, picker, and filter
+	features/workspace/components/     Entry forms, hierarchy list, drag rows, graph
+	features/workspace/model/          Typed hierarchy, filtering, and move rules
+	features/workspace/__tests__/      Workspace behavior regressions
+	services/                         Forge/preview transport and Jira user access
+	styles/                           Global foundation and design tokens
+	types/                            Type-only exports of the shared contracts
+```
+
+Reusable controls do not own workspace state. Workspace components receive typed data and callbacks; platform requests live in services. Shared contracts are imported as types, not frontend runtime dependencies. Backend validation still accepts `unknown` and validates it before saving.
+
+The frontend uses TypeScript 4.9 to match Create React App 5's supported compiler range; the backend uses TypeScript 5.9. Keep the compilers package-local. Backend tests run through `tsx`, and frontend tests remain on the existing CRA/Jest runner.
+
 Vis Network is pinned to `9.1.13` because the tested 10.x releases publish source maps referencing TypeScript files missing from the package. This version includes complete source maps and supports the app's graph API. Keep the pin until a fixed release is verified; application source maps remain enabled.
 
 ## Folders, Goals, and Metrics
@@ -63,9 +87,10 @@ pnpm test
 
 ## Code Quality
 
-Run these commands from `compass/`. ESLint covers backend and frontend JavaScript; Prettier covers source, configuration, and documentation. Generated builds, dependencies, coverage, and lockfiles are excluded where applicable.
+Run these commands from `compass/`. Type checking covers backend, shared contracts, frontend, and tests. ESLint covers TypeScript and tooling configuration; Prettier covers source, configuration, and documentation. Generated builds, dependencies, coverage, and lockfiles are excluded where applicable.
 
 ```sh
+pnpm typecheck
 pnpm lint
 pnpm lint:fix
 pnpm format:check
@@ -80,7 +105,7 @@ Run the full workflow from the app root (`compass/`):
 pnpm run deploy
 ```
 
-This builds the frontend, deploys the app, and upgrades the existing installation. Each step runs only if the previous step succeeds. Forge prompts for deployment and installation options.
+This type-checks both packages, builds the frontend, deploys the app with `MAJOR_VERSION_RULE` approval, and upgrades the existing installation. Each step runs only if the previous step succeeds. Forge prompts for deployment and installation options.
 
 From the app root (`compass/`), build the frontend before deploying, then upgrade the existing Jira installation:
 

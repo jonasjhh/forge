@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { workspaceKey } from './workspace.js';
+import { workspaceKey } from './workspace';
 
 test('given different signed-in users, both use the same workspace', () => {
     assert.equal(workspaceKey({ accountId: 'alice' }), workspaceKey({ accountId: 'bob' }));

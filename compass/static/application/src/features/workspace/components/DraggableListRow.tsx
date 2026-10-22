@@ -1,8 +1,25 @@
 import React from 'react';
 import { useDndContext, useDraggable, useDroppable } from '@dnd-kit/core';
 import { GripVertical } from 'lucide-react';
+import type { DropPlacement, ListRow, WorkspaceEntry } from '../../../types/workspace';
 
-function DropZone({ path, placement, disabled }) {
+export interface DragEntryData {
+    path: string;
+    entry: WorkspaceEntry;
+}
+export interface DropTargetData {
+    path: string;
+    placement: DropPlacement;
+}
+
+interface DraggableListRowProps {
+    row: ListRow;
+    selectedId: string | null;
+    busy: boolean;
+    children: (dragHandle: React.ReactNode, dropTargets: React.ReactNode) => React.ReactNode;
+}
+
+function DropZone({ path, placement, disabled }: DropTargetData & { disabled: boolean }) {
     const { isOver, setNodeRef } = useDroppable({
         id: `${path}:${placement}`,
         data: { path, placement },
@@ -18,7 +35,12 @@ function DropZone({ path, placement, disabled }) {
     );
 }
 
-export default function DraggableListRow({ row, selectedId, busy, children }) {
+export default function DraggableListRow({
+    row,
+    selectedId,
+    busy,
+    children
+}: DraggableListRowProps) {
     const { entry, path, depth } = row;
     const { active } = useDndContext();
     const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({

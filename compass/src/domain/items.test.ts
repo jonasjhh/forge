@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { validateGraph } from './items.js';
+import { validateGraph } from './items';
 
-const item = (id, childIds = [], type = 'folder') => ({
+const item = (id: string, childIds: unknown[] = [], type = 'folder') => ({
     id,
     type,
     name: id,

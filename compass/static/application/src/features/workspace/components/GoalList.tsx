@@ -10,57 +10,82 @@ import {
     useSensor,
     useSensors
 } from '@dnd-kit/core';
-import { buildListRows } from './entries';
-import AssigneeChip from './AssigneeChip';
+import { buildListRows } from '../model/entries';
+import AssigneeChip from '../../../components/assignees/AssigneeChip';
 import DraggableListRow from './DraggableListRow';
+import type { CollisionDetection, DragEndEvent } from '@dnd-kit/core';
+import type { DragEntryData, DropTargetData } from './DraggableListRow';
+import type { DropPlacement, WorkspaceEntry } from '../../../types/workspace';
 
-function listCollisionDetection(args) {
-    return args.pointerCoordinates ? pointerWithin(args) : closestCenter(args);
+interface GoalListProps {
+    items: WorkspaceEntry[];
+    entries: WorkspaceEntry[];
+    selectedId: string | null;
+    busy: boolean;
+    onSelect: (id: string) => void;
+    onRearrange: (
+        sourcePath: string,
+        targetPath: string,
+        placement: DropPlacement
+    ) => Promise<boolean>;
 }
 
-export default function GoalList({ items, entries, selectedId, busy, onSelect, onRearrange }) {
+const listCollisionDetection: CollisionDetection = (args) => {
+    return args.pointerCoordinates ? pointerWithin(args) : closestCenter(args);
+};
+
+export default function GoalList({
+    items,
+    entries,
+    selectedId,
+    busy,
+    onSelect,
+    onRearrange
+}: GoalListProps) {
     const filterKey = entries.map((entry) => entry.id).join('|');
-    const [collapseState, setCollapseState] = useState(() => ({ filterKey, paths: new Set() }));
+    const [collapseState, setCollapseState] = useState(() => ({
+        filterKey,
+        paths: new Set<string>()
+    }));
     const [rowLimit, setRowLimit] = useState(250);
-    const collapsedPaths = collapseState.filterKey === filterKey ? collapseState.paths : new Set();
+    const collapsedPaths =
+        collapseState.filterKey === filterKey ? collapseState.paths : new Set<string>();
     const projectedRows = buildListRows(items, entries, collapsedPaths, rowLimit + 1);
     const rows = projectedRows.slice(0, rowLimit);
-    const [activeEntry, setActiveEntry] = useState(null);
+    const [activeEntry, setActiveEntry] = useState<WorkspaceEntry | null>(null);
     const [moveStatus, setMoveStatus] = useState('');
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
         useSensor(KeyboardSensor)
     );
 
-    async function finishDrag({ active, over }) {
+    async function finishDrag({ active, over }: DragEndEvent): Promise<void> {
         setActiveEntry(null);
-        if (!over) {
+        const source = active.data.current as DragEntryData | undefined;
+        const destination = over?.data.current as DropTargetData | undefined;
+        if (!source || !destination) {
             setMoveStatus('Move cancelled.');
             return;
         }
         try {
-            const saved = await onRearrange(
-                active.data.current.path,
-                over.data.current.path,
-                over.data.current.placement
-            );
-            if (saved && over.data.current.placement === 'inside') {
+            const saved = await onRearrange(source.path, destination.path, destination.placement);
+            if (saved && destination.placement === 'inside') {
                 setCollapseState((current) => {
                     if (current.filterKey !== filterKey) return current;
                     const paths = new Set(current.paths);
-                    paths.delete(over.data.current.path);
+                    paths.delete(destination.path);
                     return { ...current, paths };
                 });
             }
-            setMoveStatus(
-                saved ? `Moved ${active.data.current.entry.name}.` : 'The move could not be saved.'
-            );
+            setMoveStatus(saved ? `Moved ${source.entry.name}.` : 'The move could not be saved.');
         } catch (failure) {
-            setMoveStatus(failure.message);
+            setMoveStatus(
+                failure instanceof Error ? failure.message : 'The move could not be saved.'
+            );
         }
     }
 
-    function toggleBranch(path) {
+    function toggleBranch(path: string): void {
         setCollapseState((current) => {
             const next = new Set(current.filterKey === filterKey ? current.paths : []);
             if (next.has(path)) next.delete(path);
@@ -75,7 +100,9 @@ export default function GoalList({ items, entries, selectedId, busy, onSelect, o
                 collisionDetection={listCollisionDetection}
                 onDragStart={({ active }) => {
                     setMoveStatus('');
-                    setActiveEntry(active.data.current.entry);
+                    setActiveEntry(
+                        (active.data.current as DragEntryData | undefined)?.entry || null
+                    );
                 }}
                 onDragEnd={finishDrag}
                 onDragCancel={() => {
@@ -130,7 +157,7 @@ export default function GoalList({ items, entries, selectedId, busy, onSelect, o
                             return (
                                 <DraggableListRow
                                     key={path}
-                                    row={{ entry, depth, path }}
+                                    row={{ entry, depth, path, hasChildren }}
                                     selectedId={selectedId}
                                     busy={busy}
                                 >
@@ -140,7 +167,11 @@ export default function GoalList({ items, entries, selectedId, busy, onSelect, o
                                                 {dropTargets}
                                                 <div
                                                     className="hierarchy-name"
-                                                    style={{ '--row-depth': depth }}
+                                                    style={
+                                                        {
+                                                            '--row-depth': depth
+                                                        } as React.CSSProperties
+                                                    }
                                                 >
                                                     {dragHandle}
                                                     {hasChildren ? (

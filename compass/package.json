@@ -1,22 +1,28 @@
 {
   "name": "jira-project-page-custom-ui",
   "version": "1.1.20",
-  "main": "index.js",
+  "main": "src/index.ts",
   "license": "MIT",
   "private": true,
   "scripts": {
-    "deploy": "pnpm --dir static/application build && forge deploy --approve MAJOR_VERSION_RULE && forge install --upgrade",
-    "test": "node --test src/*.test.js",
-    "lint": "eslint . --ext .js,.cjs --max-warnings 0",
+    "deploy": "pnpm typecheck && pnpm --dir static/application build && forge deploy --approve MAJOR_VERSION_RULE && forge install --upgrade",
+    "test": "tsx --test src/**/*.test.ts",
+    "typecheck": "tsc --noEmit && pnpm --dir static/application typecheck",
+    "lint": "eslint . --ext .js,.cjs,.ts,.tsx --max-warnings 0",
     "lint:fix": "pnpm lint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@typescript-eslint/eslint-plugin": "^8.72.0",
+    "@typescript-eslint/parser": "^8.72.0",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.2",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "prettier": "^3.9.10"
+    "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
+    "typescript": "5.9.3"
   },
   "dependencies": {
     "@forge/kvs": "^2.1.0",

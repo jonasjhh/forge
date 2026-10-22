@@ -1,10 +1,20 @@
-export function validateGraph(payload) {
-    if (!payload || !Array.isArray(payload.items) || payload.items.length > 100) {
+import type { Assignee, Graph, WorkspaceEntry } from '../../shared/workspace';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+}
+
+export function validateGraph(payload: unknown): Graph {
+    if (!isRecord(payload) || !Array.isArray(payload.items) || payload.items.length > 100) {
         throw new Error('A workspace can contain up to 100 items.');
     }
 
-    const items = payload.items.map((item) => {
-        if (!item || typeof item.id !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(item.id)) {
+    const items = payload.items.map((item: unknown): WorkspaceEntry => {
+        if (
+            !isRecord(item) ||
+            typeof item.id !== 'string' ||
+            !/^[a-zA-Z0-9-]{1,80}$/.test(item.id)
+        ) {
             throw new Error('Every item needs a valid ID.');
         }
         if (typeof item.name !== 'string' || !item.name.trim() || item.name.trim().length > 80) {
@@ -23,7 +33,7 @@ export function validateGraph(payload) {
             throw new Error('An item cannot have duplicate connections.');
         }
         const type = item.type ?? 'folder';
-        if (!['folder', 'goal', 'metric'].includes(type)) {
+        if (type !== 'folder' && type !== 'goal' && type !== 'metric') {
             throw new Error('Entries must be folders, goals, or metrics.');
         }
         const assignees = item.assignees ?? [];
@@ -33,9 +43,9 @@ export function validateGraph(payload) {
         if (type === 'folder' && assignees.length) {
             throw new Error('Assign users to goals and metrics, not folders.');
         }
-        const normalizedAssignees = assignees.map((assignee) => {
+        const normalizedAssignees = assignees.map((assignee: unknown): Assignee => {
             if (
-                !assignee ||
+                !isRecord(assignee) ||
                 typeof assignee.accountId !== 'string' ||
                 !assignee.accountId.trim() ||
                 assignee.accountId.length > 128 ||
@@ -48,6 +58,8 @@ export function validateGraph(payload) {
             let avatarUrl;
             if (assignee.avatarUrl) {
                 try {
+                    if (typeof assignee.avatarUrl !== 'string')
+                        throw new Error('Invalid avatar URL.');
                     const url = new URL(assignee.avatarUrl);
                     const hosts = [
                         'avatar-management--avatars.us-west-2.prod.public.atl-paas.net',
@@ -81,9 +93,9 @@ export function validateGraph(payload) {
         ) {
             throw new Error('Assignees must be unique.');
         }
-        const metric = {};
+        const metric: Pick<WorkspaceEntry, 'currentValue' | 'targetValue' | 'unit'> = {};
         if (type === 'metric') {
-            for (const field of ['currentValue', 'targetValue']) {
+            for (const field of ['currentValue', 'targetValue'] as const) {
                 const value = item[field] ?? null;
                 if (value !== null && (typeof value !== 'number' || !Number.isFinite(value))) {
                     throw new Error('Metric values must be finite numbers or empty.');
@@ -117,9 +129,9 @@ export function validateGraph(payload) {
         throw new Error('A workspace can contain up to 300 connections.');
     }
 
-    const visiting = new Set();
-    const visited = new Set();
-    function visit(item) {
+    const visiting = new Set<string>();
+    const visited = new Set<string>();
+    function visit(item: WorkspaceEntry): void {
         if (visiting.has(item.id)) {
             throw new Error('This connection would create a cycle.');
         }

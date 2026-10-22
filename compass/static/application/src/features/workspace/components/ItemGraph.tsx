@@ -1,10 +1,26 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { Network } from 'vis-network/standalone';
-import { entryTypes } from './entries';
+import { entryTypes } from '../model/entries';
+import type { ViewMode, WorkspaceEntry } from '../../../types/workspace';
 
-const ItemGraph = forwardRef(function ItemGraph({ items, selectedId, mode, onSelect }, ref) {
-    const container = useRef(null);
-    const network = useRef(null);
+export interface GraphHandle {
+    fit: () => void;
+    zoom: (factor: number) => void;
+}
+
+interface ItemGraphProps {
+    items: WorkspaceEntry[];
+    selectedId: string | null;
+    mode: ViewMode;
+    onSelect: (id: string) => void;
+}
+
+const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
+    { items, selectedId, mode, onSelect },
+    ref
+) {
+    const container = useRef<HTMLDivElement>(null);
+    const network = useRef<Network | null>(null);
 
     useImperativeHandle(
         ref,
@@ -23,6 +39,7 @@ const ItemGraph = forwardRef(function ItemGraph({ items, selectedId, mode, onSel
     );
 
     useEffect(() => {
+        if (!container.current) return;
         const relationshipItems = items.filter(
             (item) => item.type === 'goal' || item.type === 'metric'
         );
@@ -79,7 +96,7 @@ const ItemGraph = forwardRef(function ItemGraph({ items, selectedId, mode, onSel
                           },
                 nodes: {
                     shape: 'box',
-                    margin: 16,
+                    margin: { top: 16, right: 16, bottom: 16, left: 16 },
                     widthConstraint: { maximum: 180 },
                     shapeProperties: { borderRadius: 4 },
                     borderWidth: 1.5,
@@ -101,7 +118,9 @@ const ItemGraph = forwardRef(function ItemGraph({ items, selectedId, mode, onSel
             }
         );
         network.current = instance;
-        instance.on('selectNode', ({ nodes }) => onSelect(nodes[0]));
+        instance.on('selectNode', ({ nodes }: { nodes: Array<string | number> }) => {
+            if (nodes.length) onSelect(String(nodes[0]));
+        });
         instance.once('stabilizationIterationsDone', () => instance.fit());
         return () => {
             network.current = null;
@@ -114,7 +133,7 @@ const ItemGraph = forwardRef(function ItemGraph({ items, selectedId, mode, onSel
             (item) => item.id === selectedId && item.type !== 'folder'
         );
         if (network.current)
-            network.current.selectNodes(selectionExists ? [selectedId] : [], false);
+            network.current.selectNodes(selectionExists && selectedId ? [selectedId] : [], false);
     }, [selectedId, items, mode]);
 
     return (

@@ -16,10 +16,15 @@ module.exports = {
     overrides: [
         { files: ['*.cjs'], parserOptions: { sourceType: 'script' } },
         {
-            files: ['static/application/src/**/*.js'],
+            files: ['src/**/*.ts', 'shared/**/*.ts'],
+            parser: '@typescript-eslint/parser',
+            extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended', 'prettier']
+        },
+        {
+            files: ['static/application/src/**/*.{js,ts,tsx}'],
             env: { browser: true, node: false },
             extends: [reactAppConfig, 'prettier']
         },
-        { files: ['**/*.test.js'], env: { jest: true } }
+        { files: ['**/*.test.{js,ts,tsx}'], env: { jest: true } }
     ]
 };

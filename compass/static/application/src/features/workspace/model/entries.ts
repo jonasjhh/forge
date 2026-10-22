@@ -1,14 +1,28 @@
-export const entryTypes = {
+import type {
+    Assignee,
+    DropPlacement,
+    EntryType,
+    ListRow,
+    WorkspaceEntry
+} from '../../../types/workspace';
+
+export const entryTypes: Record<
+    EntryType,
+    { label: string; plural: string; color: string; border: string }
+> = {
     folder: { label: 'Folder', plural: 'Folders', color: '#dcfff1', border: '#1f845a' },
     goal: { label: 'Goal', plural: 'Goals', color: '#e9f2ff', border: '#0c66e4' },
     metric: { label: 'Metric', plural: 'Metrics', color: '#fff7d6', border: '#946f00' }
 };
 
-export function normalizeEntry(entry) {
+export function normalizeEntry(entry: WorkspaceEntry): WorkspaceEntry {
     return { ...entry, type: entry.type || 'folder', assignees: entry.assignees || [] };
 }
 
-export function matchesAssignees(entry, selectedAssignees) {
+export function matchesAssignees(
+    entry: Pick<WorkspaceEntry, 'assignees'>,
+    selectedAssignees: Assignee[]
+): boolean {
     return (
         selectedAssignees.length === 0 ||
         entry.assignees.some((assignee) =>
@@ -17,13 +31,17 @@ export function matchesAssignees(entry, selectedAssignees) {
     );
 }
 
-export function canContain(parentType, childType) {
+export function canContain(parentType: EntryType, childType: EntryType): boolean {
     return parentType === 'folder'
         ? ['folder', 'goal'].includes(childType)
         : parentType === 'goal' && ['goal', 'metric'].includes(childType);
 }
 
-export function canConnect(items, parent, child) {
+export function canConnect(
+    items: WorkspaceEntry[],
+    parent: WorkspaceEntry,
+    child: WorkspaceEntry
+): boolean {
     if (!canContain(parent.type, child.type) || parent.childIds.includes(child.id)) return false;
     const remaining = [child.id];
     const visited = new Set();
@@ -38,7 +56,11 @@ export function canConnect(items, parent, child) {
     return true;
 }
 
-export function moveGoalToFolder(items, goalId, folderId) {
+export function moveGoalToFolder(
+    items: WorkspaceEntry[],
+    goalId: string,
+    folderId: string
+): WorkspaceEntry[] {
     return items.map((entry) =>
         entry.type !== 'folder'
             ? entry
@@ -52,16 +74,21 @@ export function moveGoalToFolder(items, goalId, folderId) {
     );
 }
 
-export function buildListRows(items, entries, collapsedPaths = new Set(), maxRows = 500) {
+export function buildListRows(
+    items: WorkspaceEntry[],
+    entries: WorkspaceEntry[],
+    collapsedPaths = new Set<string>(),
+    maxRows = 500
+): ListRow[] {
     const byId = new Map(items.map((entry) => [entry.id, entry]));
-    const parents = new Map(items.map((entry) => [entry.id, []]));
+    const parents = new Map<string, string[]>(items.map((entry) => [entry.id, []]));
     items.forEach((entry) =>
         entry.childIds.forEach((childId) => parents.get(childId)?.push(entry.id))
     );
     const included = new Set(entries.map((entry) => entry.id));
     const pending = [...included];
     while (pending.length) {
-        const current = pending.pop();
+        const current = pending.pop()!;
         (parents.get(current) || []).forEach((parentId) => {
             if (!included.has(parentId)) {
                 included.add(parentId);
@@ -70,8 +97,13 @@ export function buildListRows(items, entries, collapsedPaths = new Set(), maxRow
         });
     }
 
-    const rows = [];
-    function append(entry, depth, parentPath, ancestors) {
+    const rows: ListRow[] = [];
+    function append(
+        entry: WorkspaceEntry,
+        depth: number,
+        parentPath: string,
+        ancestors: Set<string>
+    ): void {
         if (ancestors.has(entry.id) || rows.length >= maxRows) return;
         const path = parentPath ? `${parentPath}/${entry.id}` : entry.id;
         const children = entry.childIds.filter(
@@ -80,7 +112,7 @@ export function buildListRows(items, entries, collapsedPaths = new Set(), maxRow
         rows.push({ entry, depth, path, hasChildren: children.length > 0 });
         if (collapsedPaths.has(path)) return;
         const nextAncestors = new Set([...ancestors, entry.id]);
-        children.forEach((childId) => append(byId.get(childId), depth + 1, path, nextAncestors));
+        children.forEach((childId) => append(byId.get(childId)!, depth + 1, path, nextAncestors));
     }
     items
         .filter(
@@ -92,7 +124,12 @@ export function buildListRows(items, entries, collapsedPaths = new Set(), maxRow
     return rows;
 }
 
-export function moveListEntry(items, sourcePath, targetPath, placement) {
+export function moveListEntry(
+    items: WorkspaceEntry[],
+    sourcePath: string,
+    targetPath: string,
+    placement: DropPlacement
+): WorkspaceEntry[] {
     if (!['before', 'inside', 'after'].includes(placement))
         throw new Error('Choose a valid drop position.');
     const sourceParts = sourcePath.split('/');

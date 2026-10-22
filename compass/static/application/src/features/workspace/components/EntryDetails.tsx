@@ -1,0 +1,358 @@
+import React, { useEffect, useState } from 'react';
+import { ArrowRight, Check, Folder, Target, Gauge, GitBranch, Plus, Trash2, X } from 'lucide-react';
+import IconButton from '../../../components/ui/IconButton';
+import AssigneePicker from '../../../components/assignees/AssigneePicker';
+import MetricFields from './MetricFields';
+import { canConnect, entryTypes } from '../model/entries';
+import type { EntryType, WorkspaceEntry } from '../../../types/workspace';
+
+interface EntryDetailsProps {
+    item: WorkspaceEntry;
+    items: WorkspaceEntry[];
+    busy: boolean;
+    onSave: (entry: WorkspaceEntry, folderId?: string) => Promise<boolean>;
+    onSelect: (id: string) => void;
+    onDelete: () => void;
+    onCreate: (type: EntryType) => void;
+    onRelate: (parentId: string, childId: string, add: boolean) => Promise<boolean>;
+}
+export default function EntryDetails({
+    item,
+    items,
+    busy,
+    onSave: saveEntry,
+    onSelect,
+    onDelete,
+    onCreate,
+    onRelate
+}: EntryDetailsProps) {
+    const currentFolderId =
+        items.find((entry) => entry.type === 'folder' && entry.childIds.includes(item.id))?.id ||
+        '';
+    const [folderId, setFolderId] = useState(currentFolderId);
+    const [name, setName] = useState(item.name);
+    const [description, setDescription] = useState(item.description);
+    const [assignees, setAssignees] = useState(item.assignees);
+    const [metric, setMetric] = useState({
+        currentValue: item.currentValue ?? null,
+        targetValue: item.targetValue ?? null,
+        unit: item.unit || ''
+    });
+    const [target, setTarget] = useState('');
+    const [parentTarget, setParentTarget] = useState('');
+    useEffect(() => {
+        setName(item.name);
+        setDescription(item.description);
+        setAssignees(item.assignees);
+        setMetric({
+            currentValue: item.currentValue ?? null,
+            targetValue: item.targetValue ?? null,
+            unit: item.unit || ''
+        });
+        setTarget('');
+        setParentTarget('');
+        setFolderId(currentFolderId);
+    }, [item, currentFolderId]);
+
+    function onSave(updated: WorkspaceEntry): Promise<boolean> {
+        return saveEntry(
+            updated,
+            item.type === 'goal' && folderId !== currentFolderId ? folderId : undefined
+        );
+    }
+
+    const candidates = items.filter((candidate) => canConnect(items, item, candidate));
+    const parents = items.filter(
+        (candidate) =>
+            candidate.childIds.includes(item.id) &&
+            (item.type !== 'goal' || candidate.type === 'goal')
+    );
+    const parentCandidates = items.filter(
+        (candidate) => candidate.type === 'goal' && canConnect(items, candidate, item)
+    );
+    const draft = {
+        ...item,
+        name,
+        description,
+        assignees,
+        ...(item.type === 'metric' ? metric : {})
+    };
+    const changed = JSON.stringify(draft) !== JSON.stringify(item) || folderId !== currentFolderId;
+    const typeLabel =
+        item.type === 'goal' && parents.some((parent) => parent.type === 'goal')
+            ? 'Sub-goal'
+            : entryTypes[item.type].label;
+
+    return (
+        <aside className="details" aria-label={`${typeLabel} details`}>
+            <div className="panel-heading">
+                <span className={`type-badge type-${item.type}`}>{typeLabel}</span>
+                <IconButton
+                    label={`Delete ${entryTypes[item.type].label.toLowerCase()}`}
+                    disabled={busy}
+                    onClick={onDelete}
+                >
+                    <Trash2 size={17} />
+                </IconButton>
+            </div>
+            <form
+                onSubmit={(event) => {
+                    event.preventDefault();
+                    onSave(draft);
+                }}
+            >
+                <label htmlFor="item-name">Name</label>
+                <input
+                    id="item-name"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    required
+                    maxLength={80}
+                    disabled={busy}
+                />
+                <label htmlFor="item-description">
+                    Description <span className="optional">optional</span>
+                </label>
+                <textarea
+                    id="item-description"
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    rows={4}
+                    maxLength={500}
+                    disabled={busy}
+                />
+                {item.type === 'goal' && (
+                    <React.Fragment>
+                        <label htmlFor="goal-folder">Folder</label>
+                        <select
+                            id="goal-folder"
+                            value={folderId}
+                            disabled={busy}
+                            onChange={(event) => setFolderId(event.target.value)}
+                        >
+                            <option value="">No direct folder</option>
+                            {items
+                                .filter((entry) => entry.type === 'folder')
+                                .map((folder) => (
+                                    <option key={folder.id} value={folder.id}>
+                                        {folder.name}
+                                    </option>
+                                ))}
+                        </select>
+                    </React.Fragment>
+                )}
+                {item.type === 'metric' && (
+                    <MetricFields
+                        value={metric}
+                        onChange={setMetric}
+                        disabled={busy}
+                        prefix="edit-metric"
+                    />
+                )}
+                {item.type !== 'folder' && (
+                    <AssigneePicker
+                        value={assignees}
+                        onChange={setAssignees}
+                        disabled={busy}
+                        id="edit-assignees"
+                    />
+                )}
+                <button
+                    className="button secondary save-button"
+                    type="submit"
+                    disabled={busy || !name.trim() || !changed}
+                >
+                    <Check size={16} />
+                    Save changes
+                </button>
+            </form>
+            {item.type !== 'metric' && (
+                <section className="relationships" aria-labelledby="children-heading">
+                    <h2 id="children-heading">
+                        {item.type === 'goal' ? 'Sub-goals and metrics' : 'Contents'}{' '}
+                        <span className="count">{item.childIds.length}</span>
+                    </h2>
+                    <div className="add-child-actions">
+                        {item.type === 'folder' && (
+                            <button
+                                type="button"
+                                className="button secondary"
+                                disabled={busy}
+                                onClick={() => onCreate('folder')}
+                            >
+                                <Folder size={15} />
+                                Add folder
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            className="button secondary"
+                            disabled={busy}
+                            onClick={() => onCreate('goal')}
+                        >
+                            <Target size={15} />
+                            {item.type === 'goal' ? 'Add sub-goal' : 'Add goal'}
+                        </button>
+                        {item.type === 'goal' && (
+                            <button
+                                type="button"
+                                className="button secondary"
+                                disabled={busy}
+                                onClick={() => onCreate('metric')}
+                            >
+                                <Gauge size={15} />
+                                Add metric
+                            </button>
+                        )}
+                    </div>
+                    {item.childIds.length === 0 && <p className="muted">No contents yet.</p>}
+                    <ul className="relationship-list">
+                        {item.childIds.map((childId) => {
+                            const child = items.find((candidate) => candidate.id === childId);
+                            if (!child) return null;
+                            return (
+                                <li key={childId}>
+                                    <button
+                                        type="button"
+                                        className="relationship-link"
+                                        onClick={() => onSelect(childId)}
+                                    >
+                                        <ArrowRight size={15} />
+                                        <span>{child.name}</span>
+                                    </button>
+                                    <IconButton
+                                        label={`Remove ${child.name} from ${item.name}`}
+                                        disabled={busy || !name.trim()}
+                                        onClick={() =>
+                                            onSave({
+                                                ...draft,
+                                                childIds: item.childIds.filter(
+                                                    (id) => id !== childId
+                                                )
+                                            })
+                                        }
+                                    >
+                                        <X size={15} />
+                                    </IconButton>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                    <form
+                        className="connect-form"
+                        onSubmit={async (event) => {
+                            event.preventDefault();
+                            if (
+                                target &&
+                                (await onSave({ ...draft, childIds: [...item.childIds, target] }))
+                            )
+                                setTarget('');
+                        }}
+                    >
+                        <label htmlFor="connect-item">Add existing</label>
+                        <div className="connect-row">
+                            <select
+                                id="connect-item"
+                                value={target}
+                                onChange={(event) => setTarget(event.target.value)}
+                                disabled={busy || !candidates.length}
+                            >
+                                <option value="">
+                                    {candidates.length ? 'Select an entry' : 'No available entries'}
+                                </option>
+                                {candidates.map((candidate) => (
+                                    <option key={candidate.id} value={candidate.id}>
+                                        {candidate.name} ({entryTypes[candidate.type].label})
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                className="icon-button connect-button"
+                                type="submit"
+                                title="Add existing entry"
+                                aria-label="Add existing entry"
+                                disabled={busy || !target || !name.trim()}
+                            >
+                                <Plus size={18} />
+                            </button>
+                        </div>
+                    </form>
+                </section>
+            )}
+            <section className="relationships" aria-labelledby="parents-heading">
+                <h2 id="parents-heading">
+                    {item.type === 'goal' ? 'Parent goals' : 'Inside'}{' '}
+                    <span className="count">{parents.length}</span>
+                </h2>
+                {!parents.length && (
+                    <p className="muted">
+                        {item.type === 'goal' ? 'No parent goals' : 'Workspace root'}
+                    </p>
+                )}
+                <ul className="relationship-list">
+                    {parents.map((parent) => (
+                        <li key={parent.id}>
+                            <button
+                                type="button"
+                                className="relationship-link"
+                                onClick={() => onSelect(parent.id)}
+                            >
+                                <GitBranch size={15} />
+                                <span>{parent.name}</span>
+                            </button>
+                            {item.type === 'goal' && (
+                                <IconButton
+                                    label={`Unlink parent ${parent.name}`}
+                                    disabled={busy}
+                                    onClick={() => onRelate(parent.id, item.id, false)}
+                                >
+                                    <X size={15} />
+                                </IconButton>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+                {item.type === 'goal' && (
+                    <form
+                        className="connect-form"
+                        onSubmit={async (event) => {
+                            event.preventDefault();
+                            if (parentTarget && (await onRelate(parentTarget, item.id, true)))
+                                setParentTarget('');
+                        }}
+                    >
+                        <label htmlFor="parent-goal">Link parent goal</label>
+                        <div className="connect-row">
+                            <select
+                                id="parent-goal"
+                                value={parentTarget}
+                                onChange={(event) => setParentTarget(event.target.value)}
+                                disabled={busy || !parentCandidates.length}
+                            >
+                                <option value="">
+                                    {parentCandidates.length
+                                        ? 'Select a goal'
+                                        : 'No available goals'}
+                                </option>
+                                {parentCandidates.map((parent) => (
+                                    <option key={parent.id} value={parent.id}>
+                                        {parent.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                className="icon-button connect-button"
+                                type="submit"
+                                title="Link parent goal"
+                                aria-label="Link parent goal"
+                                disabled={busy || !parentTarget}
+                            >
+                                <Plus size={18} />
+                            </button>
+                        </div>
+                    </form>
+                )}
+            </section>
+        </aside>
+    );
+}
