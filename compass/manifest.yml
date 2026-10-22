@@ -19,6 +19,9 @@ permissions:
   scopes:
     - storage:app
     - read:jira-user
+  content:
+    styles:
+      - unsafe-inline
   external:
     images:
       - address: https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net

@@ -6,8 +6,9 @@ import App from '../../../app/App';
 import ItemGraph from '../components/ItemGraph';
 import AssigneeChip from '../../../components/assignees/AssigneeChip';
 import { getUserAvatar } from '../../../services/jiraUsers';
+import * as jiraUsers from '../../../services/jiraUsers';
 import type { SavedGraph, WorkspaceEntry } from '../../../types/workspace';
-import { buildListRows, matchesAssignees, moveGoalToFolder, moveListEntry } from '../model/entries';
+import { buildListRows, matchesAssignees, moveGoalToGroup, moveListEntry } from '../model/entries';
 
 test('given several selected assignees, entries matching any selected account are included', () => {
     const alice = { accountId: 'alice', displayName: 'Alice' };
@@ -26,6 +27,51 @@ test('given several selected assignees, entries matching any selected account ar
     );
 });
 
+test('given the type dropdown, checkboxes select multiple types and retain only matching ancestor chains', async () => {
+    const items = [
+        entryFixture({ id: 'group', type: 'group', childIds: ['goal'] }),
+        entryFixture({ id: 'goal', type: 'goal', childIds: ['metric'] }),
+        entryFixture({ id: 'metric', type: 'metric' }),
+        entryFixture({ id: 'empty-group', type: 'group' })
+    ];
+    localStorage.setItem('compass-preview-v1', JSON.stringify({ items, updatedAt: null }));
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    const checkbox = (value: string) =>
+        required(
+            container.querySelector<HTMLInputElement>(`.checkbox-dropdown input[value="${value}"]`)
+        );
+    const setChecked = (value: string, checked: boolean) =>
+        act(() => {
+            checkbox(value).checked = checked;
+            Simulate.change(checkbox(value));
+        });
+
+    expect(checkbox('all').checked).toBe(true);
+    setChecked('group', false);
+    expect(checkbox('goal').checked).toBe(true);
+    expect(checkbox('metric').checked).toBe(true);
+    expect(checkbox('all').indeterminate).toBe(true);
+    expect(
+        [...container.querySelectorAll<HTMLElement>('.entry-row')].map((row) => row.dataset.entryId)
+    ).toEqual(['group', 'goal', 'metric']);
+    expect(required(container.querySelector('.connection-count')).textContent).toBe('2 matches');
+
+    setChecked('goal', false);
+    expect(required(container.querySelector('.connection-count')).textContent).toBe('1 match');
+    expect(
+        [...container.querySelectorAll<HTMLElement>('.entry-row')].map((row) => row.dataset.entryId)
+    ).toEqual(['group', 'goal', 'metric']);
+
+    setChecked('all', false);
+    expect(container.querySelector('.entry-row')).toBeNull();
+    expect(checkbox('all').indeterminate).toBe(false);
+    setChecked('all', true);
+    expect(container.querySelector('[data-entry-id="empty-group"]')).not.toBeNull();
+    expect(required(container.querySelector('.connection-count')).textContent).toBe('4 entries');
+});
+
 test('given the assignee filter, selecting people uses OR matching and clear all restores unrelated rows', async () => {
     const alice = { accountId: 'preview-alice', displayName: 'Alice' };
     const bob = { accountId: 'preview-bob', displayName: 'Bob' };
@@ -34,8 +80,8 @@ test('given the assignee filter, selecting people uses OR matching and clear all
         JSON.stringify({
             items: [
                 {
-                    id: 'folder',
-                    type: 'folder',
+                    id: 'group',
+                    type: 'group',
                     name: 'Strategy',
                     description: '',
                     childIds: ['parent', 'unrelated'],
@@ -98,7 +144,7 @@ test('given the assignee filter, selecting people uses OR matching and clear all
     });
     expect(
         [...container.querySelectorAll<HTMLElement>('.entry-row')].map((row) => row.dataset.entryId)
-    ).toEqual(['folder', 'parent', 'metric']);
+    ).toEqual(['group', 'parent', 'metric']);
     expect(required(container.querySelector('.connection-count')).textContent).toBe('1 match');
     await act(async () => {
         Simulate.click(
@@ -113,31 +159,31 @@ test('given the assignee filter, selecting people uses OR matching and clear all
     });
     expect(
         [...container.querySelectorAll<HTMLElement>('.entry-row')].map((row) => row.dataset.entryId)
-    ).toEqual(['folder', 'parent', 'metric', 'bob-goal']);
+    ).toEqual(['group', 'parent', 'metric', 'bob-goal']);
     await act(async () => {
         Simulate.click(required(container.querySelector('.clear-assignee-filter')));
     });
     expect(container.querySelector('[data-entry-id="unrelated"]')).not.toBeNull();
-    expect(container.querySelector('.column-folder')).toBeNull();
+    expect(container.querySelector('.column-group')).toBeNull();
 });
 
-test('given folder editing in details, saving a new folder preserves goal-parent relationships and metrics', async () => {
+test('given group editing in details, saving a new group preserves goal-parent relationships and metrics', async () => {
     localStorage.setItem(
         'compass-preview-v1',
         JSON.stringify({
             items: [
                 {
-                    id: 'old-folder',
-                    type: 'folder',
-                    name: 'Old folder',
+                    id: 'old-group',
+                    type: 'group',
+                    name: 'Old group',
                     description: '',
                     childIds: ['goal'],
                     assignees: []
                 },
                 {
-                    id: 'new-folder',
-                    type: 'folder',
-                    name: 'New folder',
+                    id: 'new-group',
+                    type: 'group',
+                    name: 'New group',
                     description: '',
                     childIds: [],
                     assignees: []
@@ -177,24 +223,24 @@ test('given folder editing in details, saving a new folder preserves goal-parent
         Simulate.click(required(container.querySelector('[aria-label="Open goal Shared goal"]')));
     });
     act(() => {
-        changeValue(required(container.querySelector('#goal-folder')), 'new-folder');
+        changeValue(required(container.querySelector('#goal-group')), 'new-group');
     });
     await act(async () => {
         Simulate.submit(required(container.querySelector('.details > form')));
     });
     const saved = savedGraph().items;
-    expect(required(saved.find((entry) => entry.id === 'old-folder')).childIds).toEqual([]);
-    expect(required(saved.find((entry) => entry.id === 'new-folder')).childIds).toEqual(['goal']);
+    expect(required(saved.find((entry) => entry.id === 'old-group')).childIds).toEqual([]);
+    expect(required(saved.find((entry) => entry.id === 'new-group')).childIds).toEqual(['goal']);
     expect(required(saved.find((entry) => entry.id === 'parent')).childIds).toEqual(['goal']);
     expect(required(saved.find((entry) => entry.id === 'goal')).childIds).toEqual(['metric']);
 });
 
-test('given an assignee-matched metric, all parent goals and folder ancestors remain visible without unrelated siblings', () => {
+test('given an assignee-matched metric, all parent goals and group ancestors remain visible without unrelated siblings', () => {
     const alice = { accountId: 'alice', displayName: 'Alice' };
     const items = [
         entryFixture({
-            id: 'folder',
-            type: 'folder',
+            id: 'group',
+            type: 'group',
             childIds: ['first', 'unrelated'],
             assignees: []
         }),
@@ -206,7 +252,7 @@ test('given an assignee-matched metric, all parent goals and folder ancestors re
     ];
     const matches = items.filter((entry) => matchesAssignees(entry, [alice]));
     expect(buildListRows(items, matches).map((row) => row.entry.id)).toEqual([
-        'folder',
+        'group',
         'first',
         'shared',
         'metric',
@@ -218,11 +264,11 @@ test('given an assignee-matched metric, all parent goals and folder ancestors re
 
 test('given sibling goals, dragging before another goal persists their child order', () => {
     const items = [
-        entryFixture({ id: 'folder', type: 'folder', childIds: ['first', 'second'] }),
+        entryFixture({ id: 'group', type: 'group', childIds: ['first', 'second'] }),
         entryFixture({ id: 'first', type: 'goal', childIds: [] }),
         entryFixture({ id: 'second', type: 'goal', childIds: [] })
     ];
-    expect(moveListEntry(items, 'folder/second', 'folder/first', 'before')[0].childIds).toEqual([
+    expect(moveListEntry(items, 'group/second', 'group/first', 'before')[0].childIds).toEqual([
         'second',
         'first'
     ]);
@@ -232,14 +278,14 @@ test('given a shared goal, moving one occurrence preserves its other parent and 
     const items = [
         entryFixture({ id: 'first', type: 'goal', childIds: ['shared'] }),
         entryFixture({ id: 'second', type: 'goal', childIds: ['shared'] }),
-        entryFixture({ id: 'folder', type: 'folder', childIds: [] }),
+        entryFixture({ id: 'group', type: 'group', childIds: [] }),
         entryFixture({ id: 'shared', type: 'goal', childIds: ['metric'] }),
         entryFixture({ id: 'metric', type: 'metric', childIds: [] })
     ];
-    const moved = moveListEntry(items, 'first/shared', 'folder', 'inside');
+    const moved = moveListEntry(items, 'first/shared', 'group', 'inside');
     expect(required(moved.find((entry) => entry.id === 'first')).childIds).toEqual([]);
     expect(required(moved.find((entry) => entry.id === 'second')).childIds).toEqual(['shared']);
-    expect(required(moved.find((entry) => entry.id === 'folder')).childIds).toEqual(['shared']);
+    expect(required(moved.find((entry) => entry.id === 'group')).childIds).toEqual(['shared']);
     expect(required(moved.find((entry) => entry.id === 'shared')).childIds).toEqual(['metric']);
 });
 
@@ -253,24 +299,22 @@ test('given a descendant drop, dragging a parent beneath its child is rejected',
     );
 });
 
-test('given a metric, dragging it into a folder is rejected', () => {
+test('given a metric, dragging it into a group is rejected', () => {
     const items = [
         entryFixture({ id: 'goal', type: 'goal', childIds: ['metric'] }),
         entryFixture({ id: 'metric', type: 'metric', childIds: [] }),
-        entryFixture({ id: 'folder', type: 'folder', childIds: [] })
+        entryFixture({ id: 'group', type: 'group', childIds: [] })
     ];
-    expect(() => moveListEntry(items, 'goal/metric', 'folder', 'inside')).toThrow(
-        /Folders contain/
-    );
+    expect(() => moveListEntry(items, 'goal/metric', 'group', 'inside')).toThrow(/Groups contain/);
 });
 
 test('given root entries, dragging changes their saved list order', () => {
     const items = [
         entryFixture({ id: 'goal', type: 'goal', childIds: [] }),
-        entryFixture({ id: 'folder', type: 'folder', childIds: [] })
+        entryFixture({ id: 'group', type: 'group', childIds: [] })
     ];
-    expect(moveListEntry(items, 'folder', 'goal', 'before').map((entry) => entry.id)).toEqual([
-        'folder',
+    expect(moveListEntry(items, 'group', 'goal', 'before').map((entry) => entry.id)).toEqual([
+        'group',
         'goal'
     ]);
 });
@@ -291,6 +335,36 @@ test('given a Jira avatar URL, the user chip shows the image and name and falls 
         Simulate.error(required(container.querySelector('img')));
     });
     expect(required(container.querySelector('.assignee-avatar')).textContent).toBe('AM');
+});
+
+test('given a failed saved avatar, a fresh Jira image replaces the grey fallback', async () => {
+    const user = {
+        accountId: 'jira-refreshed-avatar',
+        displayName: 'Alex Morgan',
+        avatarUrl:
+            'https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/initials/AM-5.png'
+    };
+    const currentAvatar =
+        'https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/initials/AM-2.png';
+    let resolveAvatar!: (url: string | null) => void;
+    jest.spyOn(jiraUsers, 'loadAvatar').mockReturnValue(
+        new Promise((resolve) => {
+            resolveAvatar = resolve;
+        })
+    );
+    await act(async () => {
+        ReactDOM.render(<AssigneeChip user={user} />, container);
+    });
+    act(() => {
+        Simulate.error(required(container.querySelector('img')));
+    });
+    expect(container.querySelector('img')).toBeNull();
+
+    await act(async () => {
+        resolveAvatar(currentAvatar);
+    });
+
+    expect(required(container.querySelector('img')).src).toBe(currentAvatar);
 });
 
 test('given Jira avatar metadata, only approved HTTPS image hosts are used', () => {
@@ -333,7 +407,7 @@ function entryFixture(entry: Pick<WorkspaceEntry, 'id'> & Partial<WorkspaceEntry
         description: '',
         childIds: [],
         assignees: [],
-        type: 'folder',
+        type: 'group',
         ...entry
     };
 }
@@ -396,8 +470,8 @@ test('given a selected parent, deleting it preserves its child and clears the se
         'compass-preview-v1',
         JSON.stringify({
             items: [
-                { id: 'platform', name: 'Platform', description: '', childIds: ['identity'] },
-                { id: 'identity', name: 'Identity', description: '', childIds: [] }
+                entryFixture({ id: 'platform', name: 'Platform', childIds: ['identity'] }),
+                entryFixture({ id: 'identity', name: 'Identity' })
             ],
             updatedAt: null
         })
@@ -406,10 +480,10 @@ test('given a selected parent, deleting it preserves its child and clears the se
         ReactDOM.render(<App />, container);
     });
     act(() => {
-        Simulate.click(required(container.querySelector('[aria-label="Open folder Platform"]')));
+        Simulate.click(required(container.querySelector('[aria-label="Open group Platform"]')));
     });
     act(() => {
-        Simulate.click(required(container.querySelector('[aria-label="Delete folder"]')));
+        Simulate.click(required(container.querySelector('[aria-label="Delete group"]')));
     });
 
     await act(async () => {
@@ -425,7 +499,7 @@ test('given a selected parent, deleting it preserves its child and clears the se
             name: 'Identity',
             description: '',
             childIds: [],
-            type: 'folder',
+            type: 'group',
             assignees: []
         }
     ]);
@@ -457,8 +531,8 @@ test('given a goal, creating an assigned metric saves its values and parent conn
         JSON.stringify({
             items: [
                 {
-                    id: 'folder',
-                    type: 'folder',
+                    id: 'group',
+                    type: 'group',
                     name: 'Strategy',
                     description: '',
                     childIds: ['goal'],
@@ -540,11 +614,11 @@ test('given a goal, creating an assigned metric saves its values and parent conn
     ]);
 });
 
-test('given folders and shared goals, the graph hides folders and keeps every goal parent and metric', () => {
+test('given groups and shared goals, the graph hides groups and keeps every goal parent and metric', () => {
     const items = [
         entryFixture({
-            id: 'folder',
-            type: 'folder',
+            id: 'group',
+            type: 'group',
             name: 'Strategy',
             childIds: ['first', 'second']
         }),
@@ -555,7 +629,7 @@ test('given folders and shared goals, the graph hides folders and keeps every go
     ];
     act(() => {
         ReactDOM.render(
-            <ItemGraph items={items} selectedId="folder" mode="tree" onSelect={() => {}} />,
+            <ItemGraph items={items} selectedId="group" mode="tree" onSelect={() => {}} />,
             container
         );
     });
@@ -569,28 +643,28 @@ test('given folders and shared goals, the graph hides folders and keeps every go
     expect(mockNetwork.mock.results[0].value.selectNodes).toHaveBeenCalledWith([], false);
 });
 
-test('given a goal moved between folders, its goal parents and metric relationships remain unchanged', () => {
+test('given a goal moved between groups, its goal parents and metric relationships remain unchanged', () => {
     const items = [
-        entryFixture({ id: 'first-folder', type: 'folder', childIds: ['shared'] }),
-        entryFixture({ id: 'second-folder', type: 'folder', childIds: [] }),
+        entryFixture({ id: 'first-group', type: 'group', childIds: ['shared'] }),
+        entryFixture({ id: 'second-group', type: 'group', childIds: [] }),
         entryFixture({ id: 'first-goal', type: 'goal', childIds: ['shared'] }),
         entryFixture({ id: 'second-goal', type: 'goal', childIds: ['shared'] }),
         entryFixture({ id: 'shared', type: 'goal', childIds: ['metric'] }),
         entryFixture({ id: 'metric', type: 'metric', childIds: [] })
     ];
-    const moved = moveGoalToFolder(items, 'shared', 'second-folder');
+    const moved = moveGoalToGroup(items, 'shared', 'second-group');
     expect(moved.filter((entry) => entry.type === 'goal')).toEqual(
         items.filter((entry) => entry.type === 'goal')
     );
-    expect(required(moved.find((entry) => entry.id === 'first-folder')).childIds).toEqual([]);
-    expect(required(moved.find((entry) => entry.id === 'second-folder')).childIds).toEqual([
+    expect(required(moved.find((entry) => entry.id === 'first-group')).childIds).toEqual([]);
+    expect(required(moved.find((entry) => entry.id === 'second-group')).childIds).toEqual([
         'shared'
     ]);
 });
 
-test('given inline folders, shared branches and ungrouped roots remain visible in the hierarchy', () => {
+test('given inline groups, shared branches and ungrouped roots remain visible in the hierarchy', () => {
     const items = [
-        entryFixture({ id: 'folder', type: 'folder', childIds: ['first', 'second'] }),
+        entryFixture({ id: 'group', type: 'group', childIds: ['first', 'second'] }),
         entryFixture({ id: 'first', type: 'goal', childIds: ['shared'] }),
         entryFixture({ id: 'second', type: 'goal', childIds: ['shared'] }),
         entryFixture({ id: 'shared', type: 'goal', childIds: ['metric'] }),
@@ -598,7 +672,7 @@ test('given inline folders, shared branches and ungrouped roots remain visible i
         entryFixture({ id: 'ungrouped', type: 'goal', childIds: [] })
     ];
     expect(buildListRows(items, items).map((row) => row.entry.id)).toEqual([
-        'folder',
+        'group',
         'first',
         'shared',
         'metric',
@@ -609,7 +683,7 @@ test('given inline folders, shared branches and ungrouped roots remain visible i
     ]);
 });
 
-test('given an empty workspace, the list creates a goal without a folder or parent', async () => {
+test('given an empty workspace, the list creates a goal without a group or parent', async () => {
     await act(async () => {
         ReactDOM.render(<App />, container);
     });
@@ -701,15 +775,15 @@ test('given a sub-goal, linking and unlinking one parent leaves the other parent
     expect(required(saved.find((entry) => entry.id === 'shared')).childIds).toEqual(['metric']);
 });
 
-test('given folders and nested goals, inline rows follow their parent with increasing indentation', () => {
+test('given groups and nested goals, inline rows follow their parent with increasing indentation', () => {
     const items = [
         entryFixture({ id: 'metric', type: 'metric', childIds: [] }),
         entryFixture({ id: 'child', type: 'goal', childIds: ['metric'] }),
         entryFixture({ id: 'parent', type: 'goal', childIds: ['child'] }),
-        entryFixture({ id: 'folder', type: 'folder', childIds: ['parent'] })
+        entryFixture({ id: 'group', type: 'group', childIds: ['parent'] })
     ];
     expect(buildListRows(items, items).map(({ entry, depth }) => [entry.id, depth])).toEqual([
-        ['folder', 0],
+        ['group', 0],
         ['parent', 1],
         ['child', 2],
         ['metric', 3]
@@ -736,24 +810,24 @@ test('given a shared sub-goal, it appears beneath each parent using the same sav
     ]);
 });
 
-test('given a collapsed folder, descendants stay hidden until that branch is expanded', () => {
+test('given a collapsed group, descendants stay hidden until that branch is expanded', () => {
     const items = [
-        entryFixture({ id: 'folder', type: 'folder', childIds: ['goal'] }),
+        entryFixture({ id: 'group', type: 'group', childIds: ['goal'] }),
         entryFixture({ id: 'goal', type: 'goal', childIds: [] })
     ];
-    expect(buildListRows(items, items, new Set(['folder'])).map((row) => row.entry.id)).toEqual([
-        'folder'
+    expect(buildListRows(items, items, new Set(['group'])).map((row) => row.entry.id)).toEqual([
+        'group'
     ]);
 });
 
-test('given a matching metric, filtering retains its folder and goal ancestors as context', () => {
+test('given a matching metric, filtering retains its group and goal ancestors as context', () => {
     const items = [
-        entryFixture({ id: 'folder', type: 'folder', childIds: ['goal'] }),
+        entryFixture({ id: 'group', type: 'group', childIds: ['goal'] }),
         entryFixture({ id: 'goal', type: 'goal', childIds: ['metric'] }),
         entryFixture({ id: 'metric', type: 'metric', childIds: [] })
     ];
     expect(buildListRows(items, [items[2]]).map((row) => row.entry.id)).toEqual([
-        'folder',
+        'group',
         'goal',
         'metric'
     ]);

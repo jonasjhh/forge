@@ -1,4 +1,4 @@
-export type EntryType = 'folder' | 'goal' | 'metric';
+export type EntryType = 'group' | 'goal' | 'metric';
 
 export interface Assignee {
     accountId: string;

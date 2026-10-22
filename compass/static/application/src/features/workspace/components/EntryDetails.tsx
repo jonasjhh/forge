@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, Check, Folder, Target, Gauge, GitBranch, Plus, Trash2, X } from 'lucide-react';
+import {
+    ArrowRight,
+    Check,
+    Folder as GroupIcon,
+    Target,
+    Gauge,
+    GitBranch,
+    Plus,
+    Trash2,
+    X
+} from 'lucide-react';
 import IconButton from '../../../components/ui/IconButton';
 import AssigneePicker from '../../../components/assignees/AssigneePicker';
 import MetricFields from './MetricFields';
@@ -10,7 +20,7 @@ interface EntryDetailsProps {
     item: WorkspaceEntry;
     items: WorkspaceEntry[];
     busy: boolean;
-    onSave: (entry: WorkspaceEntry, folderId?: string) => Promise<boolean>;
+    onSave: (entry: WorkspaceEntry, groupId?: string) => Promise<boolean>;
     onSelect: (id: string) => void;
     onDelete: () => void;
     onCreate: (type: EntryType) => void;
@@ -26,10 +36,9 @@ export default function EntryDetails({
     onCreate,
     onRelate
 }: EntryDetailsProps) {
-    const currentFolderId =
-        items.find((entry) => entry.type === 'folder' && entry.childIds.includes(item.id))?.id ||
-        '';
-    const [folderId, setFolderId] = useState(currentFolderId);
+    const currentGroupId =
+        items.find((entry) => entry.type === 'group' && entry.childIds.includes(item.id))?.id || '';
+    const [groupId, setGroupId] = useState(currentGroupId);
     const [name, setName] = useState(item.name);
     const [description, setDescription] = useState(item.description);
     const [assignees, setAssignees] = useState(item.assignees);
@@ -51,13 +60,13 @@ export default function EntryDetails({
         });
         setTarget('');
         setParentTarget('');
-        setFolderId(currentFolderId);
-    }, [item, currentFolderId]);
+        setGroupId(currentGroupId);
+    }, [item, currentGroupId]);
 
     function onSave(updated: WorkspaceEntry): Promise<boolean> {
         return saveEntry(
             updated,
-            item.type === 'goal' && folderId !== currentFolderId ? folderId : undefined
+            item.type === 'goal' && groupId !== currentGroupId ? groupId : undefined
         );
     }
 
@@ -77,7 +86,7 @@ export default function EntryDetails({
         assignees,
         ...(item.type === 'metric' ? metric : {})
     };
-    const changed = JSON.stringify(draft) !== JSON.stringify(item) || folderId !== currentFolderId;
+    const changed = JSON.stringify(draft) !== JSON.stringify(item) || groupId !== currentGroupId;
     const typeLabel =
         item.type === 'goal' && parents.some((parent) => parent.type === 'goal')
             ? 'Sub-goal'
@@ -123,19 +132,19 @@ export default function EntryDetails({
                 />
                 {item.type === 'goal' && (
                     <React.Fragment>
-                        <label htmlFor="goal-folder">Folder</label>
+                        <label htmlFor="goal-group">Group</label>
                         <select
-                            id="goal-folder"
-                            value={folderId}
+                            id="goal-group"
+                            value={groupId}
                             disabled={busy}
-                            onChange={(event) => setFolderId(event.target.value)}
+                            onChange={(event) => setGroupId(event.target.value)}
                         >
-                            <option value="">No direct folder</option>
+                            <option value="">No direct group</option>
                             {items
-                                .filter((entry) => entry.type === 'folder')
-                                .map((folder) => (
-                                    <option key={folder.id} value={folder.id}>
-                                        {folder.name}
+                                .filter((entry) => entry.type === 'group')
+                                .map((group) => (
+                                    <option key={group.id} value={group.id}>
+                                        {group.name}
                                     </option>
                                 ))}
                         </select>
@@ -149,7 +158,7 @@ export default function EntryDetails({
                         prefix="edit-metric"
                     />
                 )}
-                {item.type !== 'folder' && (
+                {item.type !== 'group' && (
                     <AssigneePicker
                         value={assignees}
                         onChange={setAssignees}
@@ -173,15 +182,15 @@ export default function EntryDetails({
                         <span className="count">{item.childIds.length}</span>
                     </h2>
                     <div className="add-child-actions">
-                        {item.type === 'folder' && (
+                        {item.type === 'group' && (
                             <button
                                 type="button"
                                 className="button secondary"
                                 disabled={busy}
-                                onClick={() => onCreate('folder')}
+                                onClick={() => onCreate('group')}
                             >
-                                <Folder size={15} />
-                                Add folder
+                                <GroupIcon size={15} />
+                                Add group
                             </button>
                         )}
                         <button

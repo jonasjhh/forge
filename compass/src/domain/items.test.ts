@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { validateGraph } from './items';
 
-const item = (id: string, childIds: unknown[] = [], type = 'folder') => ({
+const item = (id: string, childIds: unknown[] = [], type = 'group') => ({
     id,
     type,
     name: id,
@@ -109,15 +109,19 @@ test('given a non-string connection ID, the graph is rejected', () => {
     assert.throws(() => validateGraph({ items: [item('project', [null])] }), /reference item IDs/);
 });
 
-test('given an existing untyped item, it becomes a folder', () => {
-    assert.deepEqual(
-        validateGraph({ items: [{ id: 'folder', name: 'Folder', description: '', childIds: [] }] })
-            .items[0],
-        { ...item('folder'), name: 'Folder' }
+test('given an entry without a type, validation rejects it', () => {
+    assert.throws(
+        () =>
+            validateGraph({
+                items: [
+                    { id: 'group', name: 'Group', description: '', childIds: [], assignees: [] }
+                ]
+            }),
+        /groups, goals, or metrics/
     );
 });
 
-test('given folders, nested goals and a metric, the hierarchy is accepted', () => {
+test('given groups, nested goals and a metric, the hierarchy is accepted', () => {
     const metric = {
         ...item('metric', [], 'metric'),
         currentValue: 10,
@@ -126,8 +130,8 @@ test('given folders, nested goals and a metric, the hierarchy is accepted', () =
     };
     const graph = {
         items: [
-            item('folder', ['nested-folder']),
-            item('nested-folder', ['goal']),
+            item('group', ['nested-group']),
+            item('nested-group', ['goal']),
             item('goal', ['subgoal'], 'goal'),
             item('subgoal', ['metric'], 'goal'),
             metric
@@ -136,17 +140,17 @@ test('given folders, nested goals and a metric, the hierarchy is accepted', () =
     assert.deepEqual(validateGraph(graph), graph);
 });
 
-test('given a metric directly in a folder, the hierarchy is rejected', () => {
+test('given a metric directly in a group, the hierarchy is rejected', () => {
     assert.throws(
-        () => validateGraph({ items: [item('folder', ['metric']), item('metric', [], 'metric')] }),
-        /Folders contain/
+        () => validateGraph({ items: [item('group', ['metric']), item('metric', [], 'metric')] }),
+        /Groups contain/
     );
 });
 
-test('given a folder inside a goal, the hierarchy is rejected', () => {
+test('given a group inside a goal, the hierarchy is rejected', () => {
     assert.throws(
-        () => validateGraph({ items: [item('goal', ['folder'], 'goal'), item('folder')] }),
-        /Folders contain/
+        () => validateGraph({ items: [item('goal', ['group'], 'goal'), item('group')] }),
+        /Groups contain/
     );
 });
 
@@ -198,18 +202,18 @@ test('given an invalid assignee, the goal is rejected', () => {
     );
 });
 
-test('given assignees on a folder, the folder is rejected', () => {
+test('given assignees on a group, the group is rejected', () => {
     assert.throws(
         () =>
             validateGraph({
                 items: [
                     {
-                        ...item('folder'),
+                        ...item('group'),
                         assignees: [{ accountId: 'jira-alice', displayName: 'Alice' }]
                     }
                 ]
             }),
-        /not folders/
+        /not groups/
     );
 });
 
@@ -224,11 +228,11 @@ test('given non-finite metric values, the metric is rejected', () => {
 test('given an unknown type, the entry is rejected', () => {
     assert.throws(
         () => validateGraph({ items: [item('unknown', [], 'unknown')] }),
-        /folders, goals, or metrics/
+        /groups, goals, or metrics/
     );
 });
 
-test('given a standalone goal with no metrics, it is accepted without a folder or parent', () => {
+test('given a standalone goal with no metrics, it is accepted without a group or parent', () => {
     const graph = { items: [item('independent', [], 'goal')] };
     assert.deepEqual(validateGraph(graph), graph);
 });

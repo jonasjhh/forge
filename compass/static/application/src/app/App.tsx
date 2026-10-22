@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
     Check,
-    Folder,
+    Folder as GroupIcon,
     Compass,
     GitBranch,
     ListTree,
@@ -16,20 +16,28 @@ import {
     ZoomOut
 } from 'lucide-react';
 import IconButton from '../components/ui/IconButton';
+import CheckboxDropdown from '../components/ui/CheckboxDropdown';
 import AssigneeFilter from '../components/assignees/AssigneeFilter';
 import EntryDetails from '../features/workspace/components/EntryDetails';
 import EntryDialog from '../features/workspace/components/EntryDialog';
 import GoalList from '../features/workspace/components/GoalList';
 import ItemGraph from '../features/workspace/components/ItemGraph';
 import {
+    entryTypes,
     matchesAssignees,
-    moveGoalToFolder,
+    moveGoalToGroup,
     moveListEntry
 } from '../features/workspace/model/entries';
 import { callWorkspace, isPreview } from '../services/workspace';
 import type { Assignee, EntryType, ViewMode, WorkspaceEntry } from '../types/workspace';
 import type { GraphHandle } from '../features/workspace/components/ItemGraph';
 import './App.css';
+
+const typeOptions = (Object.keys(entryTypes) as EntryType[]).map((type) => ({
+    value: type,
+    label: entryTypes[type].plural
+}));
+
 function App() {
     const [items, setItems] = useState<WorkspaceEntry[]>([]);
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -40,9 +48,11 @@ function App() {
     const [error, setError] = useState('');
     const [updatedAt, setUpdatedAt] = useState<string | null>(null);
     const [dialog, setDialog] = useState<'create' | 'delete' | null>(null);
-    const [createType, setCreateType] = useState<EntryType>('folder');
+    const [createType, setCreateType] = useState<EntryType>('group');
     const [createParentId, setCreateParentId] = useState('');
-    const [typeFilter, setTypeFilter] = useState<EntryType | 'all'>('all');
+    const [typeFilter, setTypeFilter] = useState<EntryType[]>(() =>
+        typeOptions.map((option) => option.value)
+    );
     const [assigneeFilter, setAssigneeFilter] = useState<Assignee[]>([]);
     const [reload, setReload] = useState(0);
     const graph = useRef<GraphHandle>(null);
@@ -99,14 +109,15 @@ function App() {
     const selected = items.find((item) => item.id === selectedId);
     const visibleItems = items.filter(
         (item) =>
-            (typeFilter === 'all' || item.type === typeFilter) &&
+            typeFilter.includes(item.type) &&
             matchesAssignees(item, assigneeFilter) &&
             `${item.name} ${item.description} ${item.assignees.map((user) => user.displayName).join(' ')}`
                 .toLowerCase()
                 .includes(search.toLowerCase())
     );
-    const relationshipItems = items.filter((item) => item.type !== 'folder');
-    const filtered = assigneeFilter.length > 0 || typeFilter !== 'all' || search.length > 0;
+    const relationshipItems = items.filter((item) => item.type !== 'group');
+    const filtered =
+        assigneeFilter.length > 0 || typeFilter.length !== typeOptions.length || search.length > 0;
     const listCountLabel = `${visibleItems.length} ${filtered ? (visibleItems.length === 1 ? 'match' : 'matches') : visibleItems.length === 1 ? 'entry' : 'entries'}`;
     const connections = relationshipItems.reduce((total, item) => total + item.childIds.length, 0);
     const workspaceAssignees = [
@@ -154,10 +165,10 @@ function App() {
                         disabled={
                             loading || busy || items.length >= 100 || Boolean(error && !updatedAt)
                         }
-                        onClick={() => openCreate('folder')}
+                        onClick={() => openCreate('group')}
                     >
-                        <Folder size={17} />
-                        New folder
+                        <GroupIcon size={17} />
+                        New group
                     </button>
                     <button
                         className="button primary"
@@ -165,7 +176,7 @@ function App() {
                             loading || busy || items.length >= 100 || Boolean(error && !updatedAt)
                         }
                         onClick={() =>
-                            openCreate('goal', selected?.type === 'folder' ? selected.id : '')
+                            openCreate('goal', selected?.type === 'group' ? selected.id : '')
                         }
                     >
                         <Plus size={17} />
@@ -243,18 +254,14 @@ function App() {
                                             onChange={(event) => setSearch(event.target.value)}
                                         />
                                     </div>
-                                    <select
-                                        aria-label="Filter by type"
+                                    <CheckboxDropdown
+                                        label="Filter by type"
+                                        allLabel="All types"
+                                        emptyLabel="No types"
+                                        options={typeOptions}
                                         value={typeFilter}
-                                        onChange={(event) =>
-                                            setTypeFilter(event.target.value as EntryType | 'all')
-                                        }
-                                    >
-                                        <option value="all">All types</option>
-                                        <option value="folder">Folders</option>
-                                        <option value="goal">Goals</option>
-                                        <option value="metric">Metrics</option>
-                                    </select>
+                                        onChange={setTypeFilter}
+                                    />
                                     <AssigneeFilter
                                         users={workspaceAssignees}
                                         value={assigneeFilter}
@@ -356,14 +363,14 @@ function App() {
                         item={selected}
                         items={items}
                         busy={busy || loading}
-                        onSave={(updated, folderId) => {
+                        onSave={(updated, groupId) => {
                             const nextItems = items.map((item) =>
                                 item.id === updated.id ? updated : item
                             );
                             return save(
-                                folderId === undefined
+                                groupId === undefined
                                     ? nextItems
-                                    : moveGoalToFolder(nextItems, updated.id, folderId)
+                                    : moveGoalToGroup(nextItems, updated.id, groupId)
                             );
                         }}
                         onSelect={setSelectedId}
@@ -412,7 +419,7 @@ function App() {
                         );
                         if (await save([...nextItems, item])) {
                             setSelectedId(item.id);
-                            if (item.type === 'folder') {
+                            if (item.type === 'group') {
                                 setMode('list');
                             }
                             setDialog(null);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronRight, Folder, Gauge, GripVertical, Target } from 'lucide-react';
+import { ChevronRight, Folder as GroupIcon, Gauge, GripVertical, Target } from 'lucide-react';
 import {
     closestCenter,
     DndContext,
@@ -10,7 +10,7 @@ import {
     useSensor,
     useSensors
 } from '@dnd-kit/core';
-import { buildListRows } from '../model/entries';
+import { buildListRows, entryTypes } from '../model/entries';
 import AssigneeChip from '../../../components/assignees/AssigneeChip';
 import DraggableListRow from './DraggableListRow';
 import type { CollisionDetection, DragEndEvent } from '@dnd-kit/core';
@@ -112,7 +112,7 @@ export default function GoalList({
             >
                 <table className="goal-table">
                     <caption className="visually-hidden">
-                        Folders, goals, sub-goals, and metrics
+                        Groups, goals, sub-goals, and metrics
                     </caption>
                     <thead>
                         <tr>
@@ -141,16 +141,16 @@ export default function GoalList({
                                     entry.childIds.includes(candidate.id)
                             );
                             const label =
-                                entry.type === 'folder'
-                                    ? 'Folder'
+                                entry.type === 'group'
+                                    ? 'Group'
                                     : entry.type === 'metric'
                                       ? 'Metric'
                                       : parents.length
                                         ? 'Sub-goal'
                                         : 'Goal';
                             const EntryIcon =
-                                entry.type === 'folder'
-                                    ? Folder
+                                entry.type === 'group'
+                                    ? GroupIcon
                                     : entry.type === 'metric'
                                       ? Gauge
                                       : Target;
@@ -196,7 +196,7 @@ export default function GoalList({
                                                     <button
                                                         type="button"
                                                         className="goal-name"
-                                                        aria-label={`Open ${entry.type} ${entry.name}`}
+                                                        aria-label={`Open ${entryTypes[entry.type].label.toLowerCase()} ${entry.name}`}
                                                         aria-pressed={selectedId === entry.id}
                                                         onClick={() => onSelect(entry.id)}
                                                     >
@@ -229,7 +229,7 @@ export default function GoalList({
                                                         ))
                                                     ) : (
                                                         <span className="muted">
-                                                            {entry.type === 'folder'
+                                                            {entry.type === 'group'
                                                                 ? '-'
                                                                 : 'Unassigned'}
                                                         </span>
@@ -250,7 +250,7 @@ export default function GoalList({
                                                         ))
                                                     ) : (
                                                         <span className="muted">
-                                                            {entry.type === 'folder' ? '-' : 'None'}
+                                                            {entry.type === 'group' ? '-' : 'None'}
                                                         </span>
                                                     )}
                                                 </div>
@@ -302,7 +302,7 @@ export default function GoalList({
             {!rows.length && (
                 <div className="list-empty">
                     <Target size={28} strokeWidth={1.5} />
-                    <h2>No matching folders, goals, or metrics</h2>
+                    <h2>No matching groups, goals, or metrics</h2>
                 </div>
             )}
         </div>

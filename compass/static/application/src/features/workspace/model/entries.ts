@@ -10,14 +10,10 @@ export const entryTypes: Record<
     EntryType,
     { label: string; plural: string; color: string; border: string }
 > = {
-    folder: { label: 'Folder', plural: 'Folders', color: '#dcfff1', border: '#1f845a' },
+    group: { label: 'Group', plural: 'Groups', color: '#dcfff1', border: '#1f845a' },
     goal: { label: 'Goal', plural: 'Goals', color: '#e9f2ff', border: '#0c66e4' },
     metric: { label: 'Metric', plural: 'Metrics', color: '#fff7d6', border: '#946f00' }
 };
-
-export function normalizeEntry(entry: WorkspaceEntry): WorkspaceEntry {
-    return { ...entry, type: entry.type || 'folder', assignees: entry.assignees || [] };
-}
 
 export function matchesAssignees(
     entry: Pick<WorkspaceEntry, 'assignees'>,
@@ -32,8 +28,8 @@ export function matchesAssignees(
 }
 
 export function canContain(parentType: EntryType, childType: EntryType): boolean {
-    return parentType === 'folder'
-        ? ['folder', 'goal'].includes(childType)
+    return parentType === 'group'
+        ? ['group', 'goal'].includes(childType)
         : parentType === 'goal' && ['goal', 'metric'].includes(childType);
 }
 
@@ -56,19 +52,19 @@ export function canConnect(
     return true;
 }
 
-export function moveGoalToFolder(
+export function moveGoalToGroup(
     items: WorkspaceEntry[],
     goalId: string,
-    folderId: string
+    groupId: string
 ): WorkspaceEntry[] {
     return items.map((entry) =>
-        entry.type !== 'folder'
+        entry.type !== 'group'
             ? entry
             : {
                   ...entry,
                   childIds: [
                       ...entry.childIds.filter((id) => id !== goalId),
-                      ...(entry.id === folderId ? [goalId] : [])
+                      ...(entry.id === groupId ? [goalId] : [])
                   ]
               }
     );
@@ -149,7 +145,7 @@ export function moveListEntry(
     const destination = items.find((entry) => entry.id === destinationParentId);
     if (destination) {
         if (!canContain(destination.type, source.type))
-            throw new Error('Folders contain folders or goals; goals contain goals or metrics.');
+            throw new Error('Groups contain groups or goals; goals contain goals or metrics.');
         if (destinationParentId !== sourceParentId && !canConnect(items, destination, source))
             throw new Error('This move would duplicate a connection or create a cycle.');
     } else {

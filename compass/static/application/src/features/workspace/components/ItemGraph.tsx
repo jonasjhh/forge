@@ -48,7 +48,7 @@ const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
             container.current,
             {
                 nodes: relationshipItems.map((item) => {
-                    const info = entryTypes[item.type || 'folder'];
+                    const info = entryTypes[item.type || 'group'];
                     const label =
                         item.type === 'goal' &&
                         items.some(
@@ -130,7 +130,7 @@ const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
 
     useEffect(() => {
         const selectionExists = items.some(
-            (item) => item.id === selectedId && item.type !== 'folder'
+            (item) => item.id === selectedId && item.type !== 'group'
         );
         if (network.current)
             network.current.selectNodes(selectionExists && selectedId ? [selectedId] : [], false);
@@ -141,7 +141,7 @@ const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
             ref={container}
             className="network-canvas"
             role="img"
-            aria-label={`${mode === 'tree' ? 'Tree' : 'Graph'} of goals and metrics. Folders are hidden; shared goals keep all parent relationships.`}
+            aria-label={`${mode === 'tree' ? 'Tree' : 'Graph'} of goals and metrics. Groups are hidden; shared goals keep all parent relationships.`}
         />
     );
 });

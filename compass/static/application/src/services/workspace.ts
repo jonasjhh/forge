@@ -1,4 +1,3 @@
-import { normalizeEntry } from '../features/workspace/model/entries';
 import type { Graph, SavedGraph, WorkspaceApi } from '../types/workspace';
 export const isPreview = ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
@@ -19,10 +18,13 @@ export async function callWorkspace(
         const graph: SavedGraph = JSON.parse(
             localStorage.getItem(previewKey) || '{"items":[],"updatedAt":null}'
         );
-        return { ...graph, items: graph.items.map(normalizeEntry) };
+        return graph;
     }
     if (!payload) throw new Error('Workspace data is required.');
-    const graph: SavedGraph = { items: payload.items, updatedAt: new Date().toISOString() };
+    const graph: SavedGraph = {
+        items: payload.items,
+        updatedAt: new Date().toISOString()
+    };
     localStorage.setItem(previewKey, JSON.stringify(graph));
     return graph;
 }

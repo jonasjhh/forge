@@ -76,7 +76,7 @@ export default function EntryDialog({
                                 type,
                                 name,
                                 description,
-                                assignees: type === 'folder' ? [] : assignees,
+                                assignees: type === 'group' ? [] : assignees,
                                 ...(type === 'metric' ? metric : {})
                             },
                             validParentId
@@ -119,9 +119,9 @@ export default function EntryDialog({
                         <label htmlFor="new-parent">
                             {type === 'metric'
                                 ? 'Goal'
-                                : type === 'folder'
+                                : type === 'group'
                                   ? 'Inside'
-                                  : 'Folder or parent goal'}
+                                  : 'Group or parent goal'}
                         </label>
                         <select
                             id="new-parent"
@@ -133,9 +133,9 @@ export default function EntryDialog({
                             <option value="">
                                 {type === 'metric'
                                     ? 'Select a goal'
-                                    : type === 'folder'
+                                    : type === 'group'
                                       ? 'Workspace root'
-                                      : 'No folder or parent goal'}
+                                      : 'No group or parent goal'}
                             </option>
                             {parentOptions.map((candidate) => (
                                 <option key={candidate.id} value={candidate.id}>
@@ -161,7 +161,7 @@ export default function EntryDialog({
                                 prefix="new-metric"
                             />
                         )}
-                        {type !== 'folder' && (
+                        {type !== 'group' && (
                             <AssigneePicker
                                 value={assignees}
                                 onChange={setAssignees}

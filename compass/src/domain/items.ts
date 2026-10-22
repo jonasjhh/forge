@@ -32,16 +32,16 @@ export function validateGraph(payload: unknown): Graph {
         if (new Set(item.childIds).size !== item.childIds.length) {
             throw new Error('An item cannot have duplicate connections.');
         }
-        const type = item.type ?? 'folder';
-        if (type !== 'folder' && type !== 'goal' && type !== 'metric') {
-            throw new Error('Entries must be folders, goals, or metrics.');
+        const type = item.type;
+        if (type !== 'group' && type !== 'goal' && type !== 'metric') {
+            throw new Error('Entries must be groups, goals, or metrics.');
         }
         const assignees = item.assignees ?? [];
         if (!Array.isArray(assignees) || assignees.length > 20) {
             throw new Error('Goals and metrics support up to 20 assignees.');
         }
-        if (type === 'folder' && assignees.length) {
-            throw new Error('Assign users to goals and metrics, not folders.');
+        if (type === 'group' && assignees.length) {
+            throw new Error('Assign users to goals and metrics, not groups.');
         }
         const normalizedAssignees = assignees.map((assignee: unknown): Assignee => {
             if (
@@ -142,11 +142,11 @@ export function validateGraph(payload: unknown): Graph {
             if (!child) throw new Error('A connection references an item that no longer exists.');
             if (
                 item.type === 'metric' ||
-                (item.type === 'folder' && child.type === 'metric') ||
-                (item.type === 'goal' && child.type === 'folder')
+                (item.type === 'group' && child.type === 'metric') ||
+                (item.type === 'goal' && child.type === 'group')
             ) {
                 throw new Error(
-                    'Folders contain folders or goals; goals contain goals or metrics; metrics have no children.'
+                    'Groups contain groups or goals; goals contain goals or metrics; metrics have no children.'
                 );
             }
             visit(child);

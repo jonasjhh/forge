@@ -12,11 +12,11 @@ interface AssigneeChipProps {
 
 export function AssigneeAvatar({ user }: Pick<AssigneeChipProps, 'user'>) {
     const [source, setSource] = useState(getUserAvatar(user));
-    const [failed, setFailed] = useState(false);
+    const [failedSource, setFailedSource] = useState<string | null>(null);
     useEffect(() => {
         let cancelled = false;
         setSource(getUserAvatar(user));
-        setFailed(false);
+        setFailedSource(null);
         loadAvatar(user).then((url) => {
             if (!cancelled) setSource(url);
         });
@@ -33,13 +33,13 @@ export function AssigneeAvatar({ user }: Pick<AssigneeChipProps, 'user'>) {
         .toUpperCase();
     return (
         <span className="assignee-avatar" aria-hidden="true">
-            {source && !failed ? (
+            {source && failedSource !== source ? (
                 <img
                     src={source}
                     alt=""
                     loading="lazy"
                     referrerPolicy="no-referrer"
-                    onError={() => setFailed(true)}
+                    onError={() => setFailedSource(source)}
                 />
             ) : (
                 initials

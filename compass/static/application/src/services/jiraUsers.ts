@@ -24,7 +24,7 @@ const avatarRequests = new Map<string, Promise<string | null>>();
 export function getUserAvatar(
     user: Partial<Assignee> & { avatarUrls?: Record<string, string> }
 ): string | null {
-    const value = user.avatarUrl || user.avatarUrls?.['48x48'] || user.avatarUrls?.['24x24'];
+    const value = user.avatarUrls?.['48x48'] || user.avatarUrls?.['24x24'] || user.avatarUrl;
     if (!value) return null;
     try {
         const url = new URL(value);
@@ -40,9 +40,9 @@ export function getUserAvatar(
 }
 
 export async function loadAvatar(user: Assignee): Promise<string | null> {
-    const provided = getUserAvatar(user);
-    if (provided) return provided;
     if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+        const provided = getUserAvatar(user);
+        if (provided) return provided;
         if (!user.accountId.startsWith('preview-')) return null;
         const initials = user.displayName
             .split(/\s+/)
@@ -51,6 +51,11 @@ export async function loadAvatar(user: Assignee): Promise<string | null> {
             .join('');
         return `https://${avatarHosts[0]}/initials/${encodeURIComponent(initials)}-5.png`;
     }
+    return loadJiraAvatar(user);
+}
+
+export async function loadJiraAvatar(user: Assignee): Promise<string | null> {
+    const provided = getUserAvatar(user);
     if (!avatarRequests.has(user.accountId)) {
         avatarRequests.set(
             user.accountId,
@@ -59,8 +64,8 @@ export async function loadAvatar(user: Assignee): Promise<string | null> {
                 const response = await requestJira(
                     `/rest/api/3/user?accountId=${encodeURIComponent(user.accountId)}`
                 );
-                return response.ok ? getUserAvatar(await response.json()) : null;
-            })().catch(() => null)
+                return response.ok ? getUserAvatar(await response.json()) || provided : provided;
+            })().catch(() => provided)
         );
     }
     return avatarRequests.get(user.accountId)!;
