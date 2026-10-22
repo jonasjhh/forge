@@ -115,6 +115,24 @@ pnpm run deploy
 
 This type-checks both packages, builds the frontend, deploys the app with `MAJOR_VERSION_RULE` approval, and upgrades the existing installation. Each step runs only if the previous step succeeds. Forge prompts for deployment and installation options.
 
+To deploy specifically to production, configure the site once in the git-ignored `.forge/production.json`. Copy the format from `production.site.example.json` and replace the hostname with your Jira site. This local config is not committed.
+
+For a production site where Compass is already installed, run:
+
+```sh
+pnpm run deploy:production
+```
+
+This reads the site from `.forge/production.json`, type-checks and builds, deploys to Forge's `production` environment, then upgrades the Jira installation on that site.
+
+For the first production installation, use the one-time command:
+
+```sh
+pnpm run deploy:production:first-install
+```
+
+It uses the same config, deploys to production, and installs the app without `--upgrade`. Subsequent production releases use `pnpm run deploy:production`.
+
 From the app root (`compass/`), build the frontend before deploying, then upgrade the existing Jira installation:
 
 ```sh

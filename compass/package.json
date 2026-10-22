@@ -6,6 +6,8 @@
   "private": true,
   "scripts": {
     "deploy": "pnpm typecheck && pnpm --dir static/application build && forge deploy --approve MAJOR_VERSION_RULE && forge install --upgrade",
+    "deploy:production": "pnpm typecheck && pnpm --dir static/application build && forge deploy --non-interactive --environment production --approve MAJOR_VERSION_RULE && forge install --non-interactive --upgrade --site \"$(node scripts/production-site.cjs)\" --product Jira --environment production",
+    "deploy:production:first-install": "pnpm typecheck && pnpm --dir static/application build && forge deploy --non-interactive --environment production --approve MAJOR_VERSION_RULE && forge install --non-interactive --site \"$(node scripts/production-site.cjs)\" --product Jira --environment production",
     "test": "tsx --test src/**/*.test.ts",
     "typecheck": "tsc --noEmit && pnpm --dir static/application typecheck",
     "lint": "eslint . --ext .js,.cjs,.ts,.tsx --max-warnings 0",
