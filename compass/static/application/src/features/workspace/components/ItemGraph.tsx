@@ -1,7 +1,7 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { Network } from 'vis-network/standalone';
-import { entryTypes } from '../model/entries';
-import type { ViewMode, WorkspaceEntry } from '../../../types/workspace';
+import { entryTypes, goalCategoryStyles } from '../model/entries';
+import type { ViewMode, WorkspaceEntry, WorkspaceLabel } from '../../../types/workspace';
 
 export interface GraphHandle {
     fit: () => void;
@@ -10,13 +10,14 @@ export interface GraphHandle {
 
 interface ItemGraphProps {
     items: WorkspaceEntry[];
+    labels: WorkspaceLabel[];
     selectedId: string | null;
     mode: ViewMode;
     onSelect: (id: string) => void;
 }
 
 const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
-    { items, selectedId, mode, onSelect },
+    { items, labels, selectedId, mode, onSelect },
     ref
 ) {
     const container = useRef<HTMLDivElement>(null);
@@ -44,25 +45,57 @@ const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
             (item) => item.type === 'goal' || item.type === 'metric'
         );
         const visibleIds = new Set(relationshipItems.map((item) => item.id));
+        const labelsById = new Map(labels.map((label) => [label.id, label]));
         const instance = new Network(
             container.current,
             {
                 nodes: relationshipItems.map((item) => {
-                    const info = entryTypes[item.type || 'group'];
-                    const label =
+                    const goalCategory = item.goalCategory ?? 'Delivery';
+                    const info =
+                        item.type === 'goal'
+                            ? goalCategoryStyles[goalCategory]
+                            : entryTypes[item.type];
+                    const isSubgoal =
                         item.type === 'goal' &&
                         items.some(
                             (parent) => parent.type === 'goal' && parent.childIds.includes(item.id)
-                        )
-                            ? 'Sub-goal'
-                            : info.label;
+                        );
+                    const label =
+                        item.type === 'goal'
+                            ? `${goalCategory}${isSubgoal ? ' · Sub-goal' : ''}`
+                            : entryTypes[item.type].label;
                     const metric =
                         item.type === 'metric'
                             ? `\n${item.currentValue ?? 'Not set'} / ${item.targetValue ?? 'Not set'} ${item.unit || ''}`
                             : '';
+                    const assignedLabels = (item.labelIds ?? [])
+                        .map((id) => labelsById.get(id)?.name)
+                        .filter((name): name is string => Boolean(name));
+                    const labelLine = assignedLabels.length
+                        ? `\n${assignedLabels
+                              .slice(0, 2)
+                              .map((name) => `# ${name}`)
+                              .join(
+                                  ' · '
+                              )}${assignedLabels.length > 2 ? ` +${assignedLabels.length - 2}` : ''}`
+                        : '';
+                    const title = [
+                        `${label}: ${item.name}`,
+                        item.type === 'metric'
+                            ? `Progress: ${item.currentValue ?? 'Not set'} / ${item.targetValue ?? 'Not set'} ${item.unit || ''}`
+                            : '',
+                        item.assignees.length
+                            ? `Assignees: ${item.assignees.map((assignee) => assignee.displayName).join(', ')}`
+                            : '',
+                        assignedLabels.length ? `Labels: ${assignedLabels.join(', ')}` : '',
+                        item.description
+                    ]
+                        .filter(Boolean)
+                        .join('\n');
                     return {
                         id: item.id,
-                        label: `${label}\n${item.name}${metric}`,
+                        label: `${label}\n${item.name}${metric}${labelLine}`,
+                        title,
                         color: { background: info.color, border: info.border }
                     };
                 }),
@@ -82,8 +115,8 @@ const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
                                   enabled: true,
                                   direction: 'UD',
                                   sortMethod: 'directed',
-                                  levelSeparation: 130,
-                                  nodeSpacing: 210
+                                  levelSeparation: 155,
+                                  nodeSpacing: 250
                               }
                             : false
                 },
@@ -92,15 +125,15 @@ const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
                         ? false
                         : {
                               stabilization: { iterations: 150 },
-                              barnesHut: { gravitationalConstant: -4500, springLength: 170 }
+                              barnesHut: { gravitationalConstant: -6500, springLength: 220 }
                           },
                 nodes: {
                     shape: 'box',
-                    margin: { top: 16, right: 16, bottom: 16, left: 16 },
-                    widthConstraint: { maximum: 180 },
+                    margin: { top: 14, right: 18, bottom: 14, left: 18 },
+                    widthConstraint: { minimum: 190, maximum: 230 },
                     shapeProperties: { borderRadius: 4 },
                     borderWidth: 1.5,
-                    font: { face: 'sans-serif', size: 15, color: '#172b4d' },
+                    font: { face: 'Atlassian Sans, sans-serif', size: 13, color: '#172b4d' },
                     color: {
                         highlight: { background: '#e9f2ff', border: '#0c66e4' },
                         hover: { background: '#f1f2f4', border: '#0c66e4' }
@@ -126,7 +159,7 @@ const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
             network.current = null;
             instance.destroy();
         };
-    }, [items, mode, onSelect]);
+    }, [items, labels, mode, onSelect]);
 
     useEffect(() => {
         const selectionExists = items.some(

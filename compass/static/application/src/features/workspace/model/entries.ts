@@ -2,6 +2,7 @@ import type {
     Assignee,
     DropPlacement,
     EntryType,
+    GoalCategory,
     ListRow,
     WorkspaceEntry
 } from '../../../types/workspace';
@@ -16,6 +17,11 @@ export const entryTypes: Record<
 };
 
 export const goalCategories = ['Decision', 'Capability', 'Delivery'] as const;
+export const goalCategoryStyles: Record<GoalCategory, { color: string; border: string }> = {
+    Decision: { color: '#fff1ef', border: '#ae2a19' },
+    Capability: { color: '#dcfff1', border: '#216e4e' },
+    Delivery: { color: '#e9f2ff', border: '#0055cc' }
+};
 
 export function matchesAssignees(
     entry: Pick<WorkspaceEntry, 'assignees'>,

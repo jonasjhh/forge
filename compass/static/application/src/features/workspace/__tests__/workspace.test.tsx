@@ -552,7 +552,12 @@ jest.mock('vis-network/standalone', () => ({
 }));
 
 interface GraphMockData {
-    nodes: Array<{ id: string }>;
+    nodes: Array<{
+        id: string;
+        label: string;
+        title: string;
+        color: { background: string; border: string };
+    }>;
     edges: Array<{ from: string; to: string }>;
 }
 interface NetworkMock {
@@ -689,6 +694,7 @@ test('given a stale selected ID, the graph clears the selection instead of selec
         ReactDOM.render(
             <ItemGraph
                 items={items}
+                labels={[]}
                 selectedId="deleted-platform"
                 mode="graph"
                 onSelect={() => {}}
@@ -790,7 +796,7 @@ test('given a goal, creating an assigned metric saves its values and parent conn
     ]);
 });
 
-test('given groups and shared goals, the graph hides groups and keeps every goal parent and metric', () => {
+test('given groups and shared goals, the tree uses category styling and preserves every relationship', () => {
     const items = [
         entryFixture({
             id: 'group',
@@ -798,19 +804,63 @@ test('given groups and shared goals, the graph hides groups and keeps every goal
             name: 'Strategy',
             childIds: ['first', 'second']
         }),
-        entryFixture({ id: 'first', type: 'goal', name: 'First', childIds: ['shared'] }),
-        entryFixture({ id: 'second', type: 'goal', name: 'Second', childIds: ['shared'] }),
-        entryFixture({ id: 'shared', type: 'goal', name: 'Shared', childIds: ['metric'] }),
-        entryFixture({ id: 'metric', type: 'metric', name: 'Metric', childIds: [] })
+        entryFixture({
+            id: 'first',
+            type: 'goal',
+            goalCategory: 'Decision',
+            name: 'First',
+            childIds: ['shared']
+        }),
+        entryFixture({
+            id: 'second',
+            type: 'goal',
+            goalCategory: 'Capability',
+            name: 'Second',
+            childIds: ['shared']
+        }),
+        entryFixture({
+            id: 'shared',
+            type: 'goal',
+            goalCategory: 'Delivery',
+            name: 'Shared',
+            description: 'Shared description',
+            childIds: ['metric'],
+            assignees: [{ accountId: 'alice', displayName: 'Alice' }],
+            labelIds: ['platform']
+        }),
+        entryFixture({
+            id: 'metric',
+            type: 'metric',
+            name: 'Metric',
+            childIds: [],
+            currentValue: 8,
+            targetValue: 10,
+            unit: 'days'
+        })
     ];
+    const labels = [{ id: 'platform', name: 'Platform', color: '#0c66e4' }];
     act(() => {
         ReactDOM.render(
-            <ItemGraph items={items} selectedId="group" mode="tree" onSelect={() => {}} />,
+            <ItemGraph
+                items={items}
+                labels={labels}
+                selectedId="group"
+                mode="tree"
+                onSelect={() => {}}
+            />,
             container
         );
     });
     const data: GraphMockData = mockNetwork.mock.calls[0][1];
     expect(data.nodes.map((node) => node.id)).toEqual(['first', 'second', 'shared', 'metric']);
+    expect(data.nodes[0].label).toBe('Decision\nFirst');
+    expect(data.nodes[0].color).toEqual({ background: '#fff1ef', border: '#ae2a19' });
+    expect(data.nodes[1].label).toBe('Capability\nSecond');
+    expect(data.nodes[2].label).toBe('Delivery · Sub-goal\nShared\n# Platform');
+    expect(data.nodes[2].title).toContain('Assignees: Alice');
+    expect(data.nodes[2].title).toContain('Labels: Platform');
+    expect(data.nodes[2].title).toContain('Shared description');
+    expect(data.nodes[3].label).toBe('Metric\nMetric\n8 / 10 days');
     expect(data.edges).toEqual([
         { from: 'first', to: 'shared' },
         { from: 'second', to: 'shared' },

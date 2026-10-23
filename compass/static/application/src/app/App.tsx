@@ -368,6 +368,7 @@ function App() {
                                     <ItemGraph
                                         ref={graph}
                                         items={items}
+                                        labels={labels}
                                         selectedId={selectedId}
                                         mode={mode}
                                         onSelect={setSelectedId}
@@ -412,10 +413,12 @@ function App() {
                                 )}
                             </div>
                             <div className="graph-footer">
-                                <span>
-                                    <span className="legend-goal" />
-                                    Goal
-                                </span>
+                                {goalCategories.map((category) => (
+                                    <span key={category}>
+                                        <span className={`legend-${category.toLowerCase()}`} />
+                                        {category}
+                                    </span>
+                                ))}
                                 <span>
                                     <span className="legend-metric" />
                                     Metric
