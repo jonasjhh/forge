@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Save, Tag, Trash2 } from 'lucide-react';
+import LabelColorPicker from '../../../components/labels/LabelColorPicker';
 import IconButton from '../../../components/ui/IconButton';
 import type { WorkspaceLabel } from '../../../types/workspace';
 
@@ -84,13 +85,11 @@ export default function LabelManager({ labels, busy, onSave }: LabelManagerProps
                     />
                 </div>
                 <div>
-                    <label htmlFor="new-label-color">Color</label>
-                    <input
-                        id="new-label-color"
-                        className="label-color-input"
-                        type="color"
+                    <label>Color</label>
+                    <LabelColorPicker
+                        ariaLabel="New label color"
                         value={color}
-                        onChange={(event) => setColor(event.target.value)}
+                        onChange={setColor}
                     />
                 </div>
                 <button
@@ -137,17 +136,15 @@ export default function LabelManager({ labels, busy, onSave }: LabelManagerProps
                                 }
                             />
                             <div className="label-preview-control">
-                                <input
-                                    aria-label={`Color for ${label.name}`}
-                                    className="label-color-input"
-                                    type="color"
+                                <LabelColorPicker
+                                    ariaLabel={`Color for ${label.name}`}
                                     value={label.color}
                                     disabled={busy}
-                                    onChange={(event) =>
+                                    onChange={(color) =>
                                         setDraft((current) =>
                                             current.map((candidate) =>
                                                 candidate.id === label.id
-                                                    ? { ...candidate, color: event.target.value }
+                                                    ? { ...candidate, color }
                                                     : candidate
                                             )
                                         )

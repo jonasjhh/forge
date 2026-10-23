@@ -128,6 +128,32 @@ export function buildListRows(
     return rows;
 }
 
+export function includeAncestors(
+    items: WorkspaceEntry[],
+    matches: WorkspaceEntry[]
+): WorkspaceEntry[] {
+    const parents = new Map<string, string[]>();
+    items.forEach((item) =>
+        item.childIds.forEach((childId) => {
+            const itemParents = parents.get(childId) ?? [];
+            itemParents.push(item.id);
+            parents.set(childId, itemParents);
+        })
+    );
+
+    const included = new Set(matches.map((item) => item.id));
+    const pending = [...included];
+    while (pending.length) {
+        (parents.get(pending.pop()!) ?? []).forEach((parentId) => {
+            if (!included.has(parentId)) {
+                included.add(parentId);
+                pending.push(parentId);
+            }
+        });
+    }
+    return items.filter((item) => included.has(item.id));
+}
+
 export function moveListEntry(
     items: WorkspaceEntry[],
     sourcePath: string,

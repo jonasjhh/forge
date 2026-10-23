@@ -28,6 +28,7 @@ import LabelManager from '../features/workspace/components/LabelManager';
 import {
     entryTypes,
     goalCategories,
+    includeAncestors,
     matchesAssignees,
     moveGoalToGroup,
     moveListEntry
@@ -128,31 +129,83 @@ function App() {
     }
 
     const selected = items.find((item) => item.id === selectedId);
-    const visibleItems = items.filter(
-        (item) =>
+    const normalizedSearch = search.trim().toLowerCase();
+    const visibleItems = items.filter((item) => {
+        const assignedLabels = (item.labelIds ?? [])
+            .map((id) => labels.find((label) => label.id === id)?.name)
+            .filter(Boolean)
+            .join(' ');
+        const searchableText = [
+            item.name,
+            item.description,
+            item.type === 'goal' ? (item.goalCategory ?? 'Delivery') : '',
+            item.assignees.map((user) => user.displayName).join(' '),
+            assignedLabels
+        ]
+            .join(' ')
+            .toLowerCase();
+        return (
             (item.type === 'goal'
                 ? typeFilter.includes(item.goalCategory ?? 'Delivery')
                 : typeFilter.includes(item.type)) &&
             matchesAssignees(item, assigneeFilter) &&
             (labelFilter.length === 0 ||
                 (item.labelIds ?? []).some((id) => labelFilter.includes(id))) &&
-            `${item.name} ${item.description} ${item.assignees.map((user) => user.displayName).join(' ')}`
-                .toLowerCase()
-                .includes(search.toLowerCase())
-    );
-    const relationshipItems = items.filter((item) => item.type !== 'group');
+            searchableText.includes(normalizedSearch)
+        );
+    });
+    const graphItems = includeAncestors(items, visibleItems);
+    const relationshipItems = graphItems.filter((item) => item.type !== 'group');
     const filtered =
         assigneeFilter.length > 0 ||
         typeFilter.length !== typeOptions.length ||
         labelFilter.length > 0 ||
         search.length > 0;
     const listCountLabel = `${visibleItems.length} ${filtered ? (visibleItems.length === 1 ? 'match' : 'matches') : visibleItems.length === 1 ? 'entry' : 'entries'}`;
-    const connections = relationshipItems.reduce((total, item) => total + item.childIds.length, 0);
+    const relationshipIds = new Set(relationshipItems.map((item) => item.id));
+    const connections = relationshipItems.reduce(
+        (total, item) =>
+            total + item.childIds.filter((childId) => relationshipIds.has(childId)).length,
+        0
+    );
     const workspaceAssignees = [
         ...new Map(
             items.flatMap((item) => item.assignees).map((user) => [user.accountId, user])
         ).values()
     ].sort((first, second) => first.displayName.localeCompare(second.displayName));
+    const workspaceFilters = (
+        <div className="workspace-filters list-filters">
+            <div className="search-field">
+                <Search size={16} />
+                <input
+                    aria-label="Search workspace"
+                    type="search"
+                    placeholder="Search names, assignees, or labels"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                />
+            </div>
+            <CheckboxDropdown
+                label="Filter by type"
+                allLabel="All types"
+                emptyLabel="No types"
+                options={typeOptions}
+                value={typeFilter}
+                onChange={setTypeFilter}
+            />
+            <AssigneeFilter
+                users={workspaceAssignees}
+                value={assigneeFilter}
+                onChange={setAssigneeFilter}
+            />
+            <LabelPicker
+                labels={labels}
+                value={labelFilter}
+                onChange={setLabelFilter}
+                label="Filter by label"
+            />
+        </div>
+    );
 
     function openCreate(type: EntryType, parentId = ''): void {
         setCreateType(type);
@@ -268,7 +321,7 @@ function App() {
                                     ? listCountLabel
                                     : mode === 'labels'
                                       ? `${labels.length} labels`
-                                      : `${connections} relationships`}
+                                      : `${relationshipItems.length} items · ${connections} relationships`}
                             </span>
                             <IconButton
                                 label="Refresh workspace"
@@ -279,6 +332,7 @@ function App() {
                             </IconButton>
                         </div>
                     </div>
+                    {mode !== 'labels' && workspaceFilters}
                     {mode === 'labels' ? (
                         <LabelManager
                             labels={labels}
@@ -303,37 +357,6 @@ function App() {
                         <div className="list-workspace">
                             <div className="list-heading">
                                 <h2>Goals</h2>
-                                <div className="list-filters">
-                                    <div className="search-field">
-                                        <Search size={16} />
-                                        <input
-                                            aria-label="Search goals"
-                                            type="search"
-                                            placeholder="Search goals or assignees"
-                                            value={search}
-                                            onChange={(event) => setSearch(event.target.value)}
-                                        />
-                                    </div>
-                                    <CheckboxDropdown
-                                        label="Filter by type"
-                                        allLabel="All types"
-                                        emptyLabel="No types"
-                                        options={typeOptions}
-                                        value={typeFilter}
-                                        onChange={setTypeFilter}
-                                    />
-                                    <AssigneeFilter
-                                        users={workspaceAssignees}
-                                        value={assigneeFilter}
-                                        onChange={setAssigneeFilter}
-                                    />
-                                    <LabelPicker
-                                        labels={labels}
-                                        value={labelFilter}
-                                        onChange={setLabelFilter}
-                                        label="Filter by label"
-                                    />
-                                </div>
                             </div>
                             {loading ? (
                                 <div className="list-empty" role="status">
@@ -367,7 +390,7 @@ function App() {
                                 ) : relationshipItems.length ? (
                                     <ItemGraph
                                         ref={graph}
-                                        items={items}
+                                        items={graphItems}
                                         labels={labels}
                                         selectedId={selectedId}
                                         mode={mode}
@@ -378,7 +401,11 @@ function App() {
                                         <span className="empty-symbol">
                                             <GitBranch size={42} strokeWidth={1.2} />
                                         </span>
-                                        <h2>No goals yet</h2>
+                                        <h2>
+                                            {filtered
+                                                ? 'No matching goals or metrics'
+                                                : 'No goals yet'}
+                                        </h2>
                                         <button
                                             className="button secondary"
                                             disabled={Boolean(error)}
@@ -434,14 +461,15 @@ function App() {
                         items={items}
                         labels={labels}
                         busy={busy || loading}
-                        onSave={(updated, groupId) => {
+                        onSave={(updated, groupId, nextLabels) => {
                             const nextItems = items.map((item) =>
                                 item.id === updated.id ? updated : item
                             );
                             return save(
                                 groupId === undefined
                                     ? nextItems
-                                    : moveGoalToGroup(nextItems, updated.id, groupId)
+                                    : moveGoalToGroup(nextItems, updated.id, groupId),
+                                nextLabels
                             );
                         }}
                         onSelect={setSelectedId}

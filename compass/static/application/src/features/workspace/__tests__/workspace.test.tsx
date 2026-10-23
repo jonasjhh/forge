@@ -244,6 +244,151 @@ test('given a workspace label, it can be created, assigned, filtered, and remove
     expect(required(savedGraph().items.find((entry) => entry.id === 'goal')).labelIds).toEqual([]);
 });
 
+test('given an item editor, creating a label assigns and saves it with the item', async () => {
+    localStorage.setItem(
+        'compass-preview-v1',
+        JSON.stringify({
+            items: [entryFixture({ id: 'goal', type: 'goal', name: 'Platform plan' })],
+            labels: [],
+            updatedAt: null
+        })
+    );
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    act(() => {
+        Simulate.click(required(container.querySelector('[aria-label="Open goal Platform plan"]')));
+    });
+    act(() => {
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('.details button')].find(
+                    (button) => button.textContent?.trim() === 'Add label'
+                )
+            )
+        );
+    });
+    act(() => {
+        changeValue(required(container.querySelector('#inline-label-name')), 'Architecture');
+    });
+
+    const colorPicker = required(
+        container.querySelector<HTMLDetailsElement>('.label-color-picker')
+    );
+    act(() => {
+        colorPicker.open = true;
+        Simulate.toggle(colorPicker);
+    });
+    expect(colorPicker.querySelectorAll('.label-color-swatch')).toHaveLength(16);
+    expect(colorPicker.querySelector('input[type="color"]')).not.toBeNull();
+    act(() => {
+        changeValue(required(colorPicker.querySelector('input[type="color"]')), '#aabbcc');
+    });
+    act(() => {
+        Simulate.click(
+            required(
+                [
+                    ...container.querySelectorAll<HTMLButtonElement>('.inline-label-create button')
+                ].find((button) => button.textContent?.trim() === 'Create and assign')
+            )
+        );
+    });
+    await act(async () => {
+        Simulate.submit(required(container.querySelector('.details form')));
+    });
+
+    expect(savedGraph().labels).toEqual([
+        { id: 'created-entry', name: 'Architecture', color: '#aabbcc' }
+    ]);
+    expect(required(savedGraph().items[0]).labelIds).toEqual(['created-entry']);
+});
+
+test('given search and filters, graph and tree retain matching item ancestors', async () => {
+    const items = [
+        entryFixture({ id: 'group', childIds: ['parent'] }),
+        entryFixture({
+            id: 'parent',
+            type: 'goal',
+            goalCategory: 'Decision',
+            name: 'Parent goal',
+            childIds: ['child']
+        }),
+        entryFixture({
+            id: 'child',
+            type: 'goal',
+            goalCategory: 'Capability',
+            name: 'Child goal',
+            childIds: ['metric']
+        }),
+        entryFixture({
+            id: 'metric',
+            type: 'metric',
+            name: 'Build count',
+            labelIds: ['platform']
+        }),
+        entryFixture({ id: 'other', type: 'goal', name: 'Unrelated' })
+    ];
+    localStorage.setItem(
+        'compass-preview-v1',
+        JSON.stringify({
+            items,
+            labels: [{ id: 'platform', name: 'Platform', color: '#0c66e4' }],
+            updatedAt: null
+        })
+    );
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+
+    const search = required(
+        container.querySelector<HTMLInputElement>('[aria-label="Search workspace"]')
+    );
+    const typeFilter = required(
+        container.querySelector<HTMLDetailsElement>('.workspace-filters .checkbox-dropdown')
+    );
+    const setType = (value: string, checked: boolean) =>
+        act(() => {
+            const checkbox = required(
+                typeFilter.querySelector<HTMLInputElement>(`input[value="${value}"]`)
+            );
+            checkbox.checked = checked;
+            Simulate.change(checkbox);
+        });
+    const latestNodeIds = () =>
+        mockNetwork.mock.calls[mockNetwork.mock.calls.length - 1][1].nodes.map((node) => node.id);
+
+    act(() => {
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].find(
+                    (button) => button.textContent?.trim() === 'Graph'
+                )
+            )
+        );
+    });
+    act(() => changeValue(search, 'Child goal'));
+    expect(latestNodeIds()).toEqual(['parent', 'child']);
+
+    setType('all', false);
+    setType('Capability', true);
+    expect(latestNodeIds()).toEqual(['parent', 'child']);
+
+    act(() => {
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].find(
+                    (button) => button.textContent?.trim() === 'Tree'
+                )
+            )
+        );
+    });
+    expect(latestNodeIds()).toEqual(['parent', 'child']);
+
+    setType('all', true);
+    act(() => changeValue(search, 'Platform'));
+    expect(latestNodeIds()).toEqual(['parent', 'child', 'metric']);
+});
+
 test('given the assignee filter, selecting people uses OR matching and clear all restores unrelated rows', async () => {
     const alice = { accountId: 'preview-alice', displayName: 'Alice' };
     const bob = { accountId: 'preview-bob', displayName: 'Bob' };
