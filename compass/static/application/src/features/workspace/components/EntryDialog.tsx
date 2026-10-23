@@ -162,7 +162,7 @@ export default function EntryDialog({
                             id="new-name"
                             autoFocus
                             required
-                            maxLength={80}
+                            maxLength={200}
                             value={name}
                             onChange={(event) => setName(event.target.value)}
                             disabled={busy}

@@ -169,6 +169,7 @@
 }
 .goal-list-view {
     min-width: 0;
+    overflow-x: auto;
 }
 .list-more {
     display: flex;
@@ -189,6 +190,7 @@
     overflow-wrap: anywhere;
 }
 .goal-table thead th {
+    position: relative;
     background: var(--white);
     color: var(--muted);
     font-size: 12px;
@@ -197,20 +199,37 @@
     padding-bottom: 10px;
 }
 .goal-table th:first-child {
-    width: 40%;
     padding-left: 20px;
 }
-.goal-table .column-assignees {
-    width: 19%;
+.column-resizer {
+    position: absolute;
+    top: 0;
+    right: -8px;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    color: var(--muted);
+    background: transparent;
+    cursor: col-resize;
+    touch-action: none;
 }
-.goal-table .column-labels {
-    width: 19%;
+.column-resizer svg {
+    opacity: 0.45;
 }
-.goal-table .column-parents {
-    width: 14%;
+.column-resizer:hover,
+.column-resizer:focus-visible {
+    color: var(--blue);
+}
+.column-resizer:hover svg,
+.column-resizer:focus-visible svg {
+    opacity: 1;
 }
 .goal-table .column-metrics {
-    width: 8%;
     text-align: center;
     padding-left: 5px;
     padding-right: 5px;
@@ -304,18 +323,6 @@
     .goal-table .column-parents {
         display: none;
     }
-    .goal-table th:first-child {
-        width: 65%;
-    }
-    .goal-table .column-assignees {
-        width: 24%;
-    }
-    .goal-table .column-labels {
-        width: 18%;
-    }
-    .goal-table .column-metrics {
-        width: 10%;
-    }
 }
 @media (max-width: 600px) {
     .app-header {
@@ -341,15 +348,10 @@
         display: none;
     }
     .goal-table th:first-child {
-        width: 65%;
         padding-left: 12px;
     }
     .goal-table .column-assignees {
         display: table-cell;
-        width: 28%;
-    }
-    .goal-table .column-labels {
-        width: 22%;
     }
     .goal-table th,
     .goal-table td {

@@ -4,6 +4,7 @@ import { act, Simulate } from 'react-dom/test-utils';
 import { Network } from 'vis-network/standalone';
 import App from '../../../app/App';
 import ItemGraph from '../components/ItemGraph';
+import GoalList from '../components/GoalList';
 import AssigneeChip from '../../../components/assignees/AssigneeChip';
 import { getUserAvatar } from '../../../services/jiraUsers';
 import * as jiraUsers from '../../../services/jiraUsers';
@@ -73,6 +74,7 @@ test('given the type dropdown, goal categories filter separately and retain matc
 });
 
 test('given a goal category, creating and changing it updates the list label and icon', async () => {
+    const longGoalName = 'A'.repeat(120);
     await act(async () => {
         ReactDOM.render(<App />, container);
     });
@@ -86,7 +88,7 @@ test('given a goal category, creating and changing it updates the list label and
         );
     });
     act(() => {
-        changeValue(required(container.querySelector('#new-name')), 'Decision plan');
+        changeValue(required(container.querySelector('#new-name')), longGoalName);
         changeValue(required(container.querySelector('#new-goal-category')), 'Capability');
     });
     await act(async () => {
@@ -100,7 +102,9 @@ test('given a goal category, creating and changing it updates the list label and
     expect(createdRow.querySelector('.entry-icon-capability')).not.toBeNull();
 
     act(() => {
-        Simulate.click(required(container.querySelector('[aria-label="Open goal Decision plan"]')));
+        Simulate.click(
+            required(container.querySelector(`[aria-label="Open goal ${longGoalName}"]`))
+        );
         changeValue(required(container.querySelector('#goal-category')), 'Decision');
     });
     await act(async () => {
@@ -244,12 +248,12 @@ test('given a workspace label, it can be created, assigned, filtered, and remove
     expect(required(savedGraph().items.find((entry) => entry.id === 'goal')).labelIds).toEqual([]);
 });
 
-test('given an item editor, creating a label assigns and saves it with the item', async () => {
+test('given an item editor, only existing labels can be assigned', async () => {
     localStorage.setItem(
         'compass-preview-v1',
         JSON.stringify({
             items: [entryFixture({ id: 'goal', type: 'goal', name: 'Platform plan' })],
-            labels: [],
+            labels: [{ id: 'architecture', name: 'Architecture', color: '#aabbcc' }],
             updatedAt: null
         })
     );
@@ -259,48 +263,28 @@ test('given an item editor, creating a label assigns and saves it with the item'
     act(() => {
         Simulate.click(required(container.querySelector('[aria-label="Open goal Platform plan"]')));
     });
+    expect(
+        [...container.querySelectorAll<HTMLButtonElement>('.details button')].some(
+            (button) => button.textContent?.trim() === 'Add label'
+        )
+    ).toBe(false);
     act(() => {
-        Simulate.click(
-            required(
-                [...container.querySelectorAll<HTMLButtonElement>('.details button')].find(
-                    (button) => button.textContent?.trim() === 'Add label'
-                )
+        const detailsLabels = required(
+            container.querySelector<HTMLElement>(
+                '.details .checkbox-dropdown-option input[value="architecture"]'
             )
         );
-    });
-    act(() => {
-        changeValue(required(container.querySelector('#inline-label-name')), 'Architecture');
-    });
-
-    const colorPicker = required(
-        container.querySelector<HTMLDetailsElement>('.label-color-picker')
-    );
-    act(() => {
-        colorPicker.open = true;
-        Simulate.toggle(colorPicker);
-    });
-    expect(colorPicker.querySelectorAll('.label-color-swatch')).toHaveLength(16);
-    expect(colorPicker.querySelector('input[type="color"]')).not.toBeNull();
-    act(() => {
-        changeValue(required(colorPicker.querySelector('input[type="color"]')), '#aabbcc');
-    });
-    act(() => {
-        Simulate.click(
-            required(
-                [
-                    ...container.querySelectorAll<HTMLButtonElement>('.inline-label-create button')
-                ].find((button) => button.textContent?.trim() === 'Create and assign')
-            )
-        );
+        (detailsLabels as HTMLInputElement).checked = true;
+        Simulate.change(detailsLabels);
     });
     await act(async () => {
         Simulate.submit(required(container.querySelector('.details form')));
     });
 
     expect(savedGraph().labels).toEqual([
-        { id: 'created-entry', name: 'Architecture', color: '#aabbcc' }
+        { id: 'architecture', name: 'Architecture', color: '#aabbcc' }
     ]);
-    expect(required(savedGraph().items[0]).labelIds).toEqual(['created-entry']);
+    expect(required(savedGraph().items[0]).labelIds).toEqual(['architecture']);
 });
 
 test('given search and filters, graph and tree retain matching item ancestors', async () => {
@@ -634,6 +618,71 @@ test('given root entries, dragging changes their saved list order', () => {
         'group',
         'goal'
     ]);
+});
+
+test('given a table column resizer, arrow keys adjust the adjacent column widths', () => {
+    const items = [entryFixture({ id: 'group', type: 'group' })];
+    act(() => {
+        ReactDOM.render(
+            <GoalList
+                items={items}
+                labels={[]}
+                entries={items}
+                selectedId={null}
+                busy={false}
+                onSelect={() => {}}
+                onRearrange={async () => true}
+            />,
+            container
+        );
+    });
+
+    const nameResizer = required(
+        container.querySelector<HTMLButtonElement>('[aria-label="Resize Name column"]')
+    );
+    const columns = required(
+        container.querySelectorAll<HTMLTableColElement>('#workspace-entry-table col')
+    );
+    expect(nameResizer.getAttribute('aria-valuenow')).toBe('40');
+    act(() => Simulate.keyDown(nameResizer, { key: 'ArrowRight' }));
+    expect(nameResizer.getAttribute('aria-valuenow')).toBe('42');
+    expect(columns[0].style.width).toBe('42%');
+    expect(columns[1].style.width).toBe('17%');
+});
+
+test('given a table column resizer, pointer dragging adjusts adjacent column widths', () => {
+    const items = [entryFixture({ id: 'group', type: 'group' })];
+    act(() => {
+        ReactDOM.render(
+            <GoalList
+                items={items}
+                labels={[]}
+                entries={items}
+                selectedId={null}
+                busy={false}
+                onSelect={() => {}}
+                onRearrange={async () => true}
+            />,
+            container
+        );
+    });
+
+    const table = required(container.querySelector<HTMLTableElement>('#workspace-entry-table'));
+    jest.spyOn(table, 'getBoundingClientRect').mockReturnValue({ width: 1000 } as DOMRect);
+    const nameResizer = required(
+        container.querySelector<HTMLButtonElement>('[aria-label="Resize Name column"]')
+    );
+    Object.defineProperty(nameResizer, 'setPointerCapture', { value: jest.fn() });
+
+    act(() => Simulate.pointerDown(nameResizer, { clientX: 100 }));
+    act(() => Simulate.pointerMove(nameResizer, { clientX: 130 }));
+
+    const columns = required(
+        container.querySelectorAll<HTMLTableColElement>('#workspace-entry-table col')
+    );
+    expect(nameResizer.getAttribute('aria-valuenow')).toBe('43');
+    expect(columns[0].style.width).toBe('43%');
+    expect(columns[1].style.width).toBe('16%');
 });
 
 test('given a Jira avatar URL, the user chip shows the image and name and falls back to initials on failure', async () => {

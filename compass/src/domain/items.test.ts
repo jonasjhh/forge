@@ -36,6 +36,18 @@ test('given whitespace and untrusted fields, saved items are normalized', () => 
     });
 });
 
+test('given a 200-character name, the graph accepts it and rejects longer names', () => {
+    const longName = 'x'.repeat(200);
+    const graph = validateGraph({
+        items: [{ ...item('goal', [], 'goal'), name: longName }]
+    });
+    assert.equal(graph.items[0].name, longName);
+    assert.throws(
+        () => validateGraph({ items: [{ ...item('goal', [], 'goal'), name: `${longName}x` }] }),
+        /200 characters/
+    );
+});
+
 test('given a self connection, the graph is rejected', () => {
     assert.throws(() => validateGraph({ items: [item('service', ['service'])] }), /cycle/);
 });

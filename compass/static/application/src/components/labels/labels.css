@@ -101,36 +101,6 @@
     opacity: 0;
     cursor: pointer;
 }
-.workspace-label-picker-controls {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-.inline-label-create {
-    display: grid;
-    gap: 8px;
-    margin-top: 10px;
-    padding: 12px;
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    background: var(--subtle);
-}
-.inline-label-create input[type='text'] {
-    width: 100%;
-    padding: 7px 9px;
-    border: 1px solid var(--ds-border-input, #8590a2);
-    background: var(--white);
-}
-.inline-label-create-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 6px;
-}
-.inline-label-error {
-    color: #ae2a19;
-    font-size: 11px;
-}
 .checkbox-option-swatch {
     width: 12px;
     height: 12px;

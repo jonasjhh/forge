@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
     ChevronRight,
     Folder as GroupIcon,
@@ -32,6 +32,38 @@ const goalCategoryIcons = {
     Capability: Layers,
     Delivery: Rocket
 };
+
+const columns = [
+    { label: 'Name', className: 'column-name' },
+    { label: 'Assignees', className: 'column-assignees' },
+    { label: 'Labels', className: 'column-labels' },
+    { label: 'Parent goals', className: 'column-parents' },
+    { label: 'Metrics', className: 'column-metrics' }
+];
+const minimumColumnWidths = [24, 12, 12, 12, 8];
+const initialColumnWidths = [40, 19, 19, 14, 8];
+
+function resizeColumnPair(widths: number[], index: number, amount: number): number[] {
+    const pairWidth = widths[index] + widths[index + 1];
+    const minimumLeft = minimumColumnWidths[index];
+    const maximumLeft = pairWidth - minimumColumnWidths[index + 1];
+    if (maximumLeft < minimumLeft) return widths;
+    const leftWidth = Math.max(minimumLeft, Math.min(maximumLeft, widths[index] + amount));
+    return widths.map((width, columnIndex) =>
+        columnIndex === index
+            ? leftWidth
+            : columnIndex === index + 1
+              ? pairWidth - leftWidth
+              : width
+    );
+}
+
+interface ResizeGesture {
+    index: number;
+    startX: number;
+    tableWidth: number;
+    widths: number[];
+}
 
 interface GoalListProps {
     items: WorkspaceEntry[];
@@ -72,6 +104,9 @@ export default function GoalList({
     const rows = projectedRows.slice(0, rowLimit);
     const [activeEntry, setActiveEntry] = useState<WorkspaceEntry | null>(null);
     const [moveStatus, setMoveStatus] = useState('');
+    const [columnWidths, setColumnWidths] = useState(initialColumnWidths);
+    const tableRef = useRef<HTMLTableElement>(null);
+    const resizeGesture = useRef<ResizeGesture | null>(null);
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
         useSensor(KeyboardSensor)
@@ -111,6 +146,45 @@ export default function GoalList({
             return { filterKey, paths: next };
         });
     }
+
+    function startColumnResize(event: React.PointerEvent<HTMLButtonElement>, index: number): void {
+        event.preventDefault();
+        event.stopPropagation();
+        const tableWidth = tableRef.current?.getBoundingClientRect().width;
+        if (!tableWidth) return;
+        resizeGesture.current = {
+            index,
+            startX: event.clientX,
+            tableWidth,
+            widths: columnWidths
+        };
+        event.currentTarget.setPointerCapture(event.pointerId);
+    }
+
+    function resizeColumn(event: React.PointerEvent<HTMLButtonElement>): void {
+        const gesture = resizeGesture.current;
+        if (!gesture) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const amount = ((event.clientX - gesture.startX) / gesture.tableWidth) * 100;
+        setColumnWidths(resizeColumnPair(gesture.widths, gesture.index, amount));
+    }
+
+    function finishColumnResize(event: React.PointerEvent<HTMLButtonElement>): void {
+        event.stopPropagation();
+        resizeGesture.current = null;
+    }
+
+    function resizeColumnWithKeyboard(
+        event: React.KeyboardEvent<HTMLButtonElement>,
+        index: number
+    ): void {
+        const amount = event.key === 'ArrowRight' ? 2 : event.key === 'ArrowLeft' ? -2 : 0;
+        if (!amount) return;
+        event.preventDefault();
+        setColumnWidths((current) => resizeColumnPair(current, index, amount));
+    }
+
     return (
         <div className="goal-list-view">
             <DndContext
@@ -128,25 +202,55 @@ export default function GoalList({
                     setMoveStatus('Move cancelled.');
                 }}
             >
-                <table className="goal-table">
+                <table id="workspace-entry-table" ref={tableRef} className="goal-table">
                     <caption className="visually-hidden">
                         Groups, goals, sub-goals, and metrics
                     </caption>
+                    <colgroup>
+                        {columns.map((column, index) => (
+                            <col
+                                key={column.className}
+                                className={column.className}
+                                style={{ width: `${columnWidths[index]}%` }}
+                            />
+                        ))}
+                    </colgroup>
                     <thead>
                         <tr>
-                            <th scope="col">Name</th>
-                            <th scope="col" className="column-assignees">
-                                Assignees
-                            </th>
-                            <th scope="col" className="column-labels">
-                                Labels
-                            </th>
-                            <th scope="col" className="column-parents">
-                                Parent goals
-                            </th>
-                            <th scope="col" className="column-metrics">
-                                Metrics
-                            </th>
+                            {columns.map((column, index) => (
+                                <th key={column.className} scope="col" className={column.className}>
+                                    {column.label}
+                                    {index < columns.length - 1 && (
+                                        <button
+                                            type="button"
+                                            className="column-resizer"
+                                            role="separator"
+                                            aria-label={`Resize ${column.label} column`}
+                                            aria-controls="workspace-entry-table"
+                                            aria-orientation="vertical"
+                                            aria-valuemin={minimumColumnWidths[index]}
+                                            aria-valuemax={
+                                                columnWidths[index] +
+                                                columnWidths[index + 1] -
+                                                minimumColumnWidths[index + 1]
+                                            }
+                                            aria-valuenow={Math.round(columnWidths[index])}
+                                            title={`Resize ${column.label} column`}
+                                            onPointerDown={(event) =>
+                                                startColumnResize(event, index)
+                                            }
+                                            onPointerMove={resizeColumn}
+                                            onPointerUp={finishColumnResize}
+                                            onPointerCancel={finishColumnResize}
+                                            onKeyDown={(event) =>
+                                                resizeColumnWithKeyboard(event, index)
+                                            }
+                                        >
+                                            <GripVertical size={14} aria-hidden="true" />
+                                        </button>
+                                    )}
+                                </th>
+                            ))}
                         </tr>
                     </thead>
                     <tbody>
@@ -187,7 +291,7 @@ export default function GoalList({
                                 >
                                     {(dragHandle, dropTargets) => (
                                         <React.Fragment>
-                                            <th scope="row" className="hierarchy-cell">
+                                            <th scope="row" className="hierarchy-cell column-name">
                                                 {dropTargets}
                                                 <div
                                                     className="hierarchy-name"

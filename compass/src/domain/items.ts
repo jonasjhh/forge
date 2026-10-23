@@ -27,8 +27,8 @@ export function validateGraph(payload: unknown): Graph {
         ) {
             throw new Error('Every item needs a valid ID.');
         }
-        if (typeof item.name !== 'string' || !item.name.trim() || item.name.trim().length > 80) {
-            throw new Error('Item names must contain between 1 and 80 characters.');
+        if (typeof item.name !== 'string' || !item.name.trim() || item.name.trim().length > 200) {
+            throw new Error('Item names must contain between 1 and 200 characters.');
         }
         if (typeof item.description !== 'string' || item.description.length > 500) {
             throw new Error('Descriptions must contain at most 500 characters.');

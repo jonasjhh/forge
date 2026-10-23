@@ -36,11 +36,7 @@ interface EntryDetailsProps {
     items: WorkspaceEntry[];
     labels: WorkspaceLabel[];
     busy: boolean;
-    onSave: (
-        entry: WorkspaceEntry,
-        groupId?: string,
-        labels?: WorkspaceLabel[]
-    ) => Promise<boolean>;
+    onSave: (entry: WorkspaceEntry, groupId?: string) => Promise<boolean>;
     onSelect: (id: string) => void;
     onDelete: () => void;
     onCreate: (type: EntryType) => void;
@@ -64,7 +60,6 @@ export default function EntryDetails({
     const [description, setDescription] = useState(item.description);
     const [assignees, setAssignees] = useState(item.assignees);
     const [labelIds, setLabelIds] = useState(item.labelIds ?? []);
-    const [draftLabels, setDraftLabels] = useState<WorkspaceLabel[] | null>(null);
     const [goalCategory, setGoalCategory] = useState<GoalCategory>(item.goalCategory ?? 'Delivery');
     const [metric, setMetric] = useState({
         currentValue: item.currentValue ?? null,
@@ -78,7 +73,6 @@ export default function EntryDetails({
         setDescription(item.description);
         setAssignees(item.assignees);
         setLabelIds(item.labelIds ?? []);
-        setDraftLabels(null);
         setGoalCategory(item.goalCategory ?? 'Delivery');
         setMetric({
             currentValue: item.currentValue ?? null,
@@ -93,8 +87,7 @@ export default function EntryDetails({
     function onSave(updated: WorkspaceEntry): Promise<boolean> {
         return saveEntry(
             updated,
-            item.type === 'goal' && groupId !== currentGroupId ? groupId : undefined,
-            draftLabels ?? undefined
+            item.type === 'goal' && groupId !== currentGroupId ? groupId : undefined
         );
     }
 
@@ -116,10 +109,7 @@ export default function EntryDetails({
         ...(item.type === 'goal' ? { goalCategory } : {}),
         ...(item.type === 'metric' ? metric : {})
     };
-    const changed =
-        JSON.stringify(draft) !== JSON.stringify(item) ||
-        groupId !== currentGroupId ||
-        draftLabels !== null;
+    const changed = JSON.stringify(draft) !== JSON.stringify(item) || groupId !== currentGroupId;
     const typeLabel =
         item.type === 'goal' && parents.some((parent) => parent.type === 'goal')
             ? 'Sub-goal'
@@ -153,7 +143,7 @@ export default function EntryDetails({
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     required
-                    maxLength={80}
+                    maxLength={200}
                     disabled={busy}
                 />
                 <label htmlFor="item-description">
@@ -168,15 +158,10 @@ export default function EntryDetails({
                     disabled={busy}
                 />
                 <LabelPicker
-                    labels={draftLabels ?? labels}
+                    labels={labels}
                     value={labelIds}
                     onChange={setLabelIds}
                     disabled={busy}
-                    onCreateLabel={(name, color) => {
-                        const label = { id: window.crypto.randomUUID(), name, color };
-                        setDraftLabels([...(draftLabels ?? labels), label]);
-                        setLabelIds((current) => [...current, label.id]);
-                    }}
                 />
                 {item.type === 'goal' && (
                     <React.Fragment>

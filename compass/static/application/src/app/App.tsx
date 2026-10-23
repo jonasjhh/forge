@@ -461,15 +461,14 @@ function App() {
                         items={items}
                         labels={labels}
                         busy={busy || loading}
-                        onSave={(updated, groupId, nextLabels) => {
+                        onSave={(updated, groupId) => {
                             const nextItems = items.map((item) =>
                                 item.id === updated.id ? updated : item
                             );
                             return save(
                                 groupId === undefined
                                     ? nextItems
-                                    : moveGoalToGroup(nextItems, updated.id, groupId),
-                                nextLabels
+                                    : moveGoalToGroup(nextItems, updated.id, groupId)
                             );
                         }}
                         onSelect={setSelectedId}
