@@ -6,19 +6,35 @@ import {
     Target,
     Gauge,
     GitBranch,
+    Layers,
+    Rocket,
     Plus,
     Trash2,
     X
 } from 'lucide-react';
 import IconButton from '../../../components/ui/IconButton';
 import AssigneePicker from '../../../components/assignees/AssigneePicker';
+import LabelPicker from '../../../components/labels/LabelPicker';
+import LabelChip from '../../../components/labels/LabelChip';
 import MetricFields from './MetricFields';
-import { canConnect, entryTypes } from '../model/entries';
-import type { EntryType, WorkspaceEntry } from '../../../types/workspace';
+import { canConnect, entryTypes, goalCategories } from '../model/entries';
+import type {
+    EntryType,
+    GoalCategory,
+    WorkspaceEntry,
+    WorkspaceLabel
+} from '../../../types/workspace';
+
+const goalCategoryIcons = {
+    Decision: GitBranch,
+    Capability: Layers,
+    Delivery: Rocket
+};
 
 interface EntryDetailsProps {
     item: WorkspaceEntry;
     items: WorkspaceEntry[];
+    labels: WorkspaceLabel[];
     busy: boolean;
     onSave: (entry: WorkspaceEntry, groupId?: string) => Promise<boolean>;
     onSelect: (id: string) => void;
@@ -29,6 +45,7 @@ interface EntryDetailsProps {
 export default function EntryDetails({
     item,
     items,
+    labels,
     busy,
     onSave: saveEntry,
     onSelect,
@@ -42,6 +59,8 @@ export default function EntryDetails({
     const [name, setName] = useState(item.name);
     const [description, setDescription] = useState(item.description);
     const [assignees, setAssignees] = useState(item.assignees);
+    const [labelIds, setLabelIds] = useState(item.labelIds ?? []);
+    const [goalCategory, setGoalCategory] = useState<GoalCategory>(item.goalCategory ?? 'Delivery');
     const [metric, setMetric] = useState({
         currentValue: item.currentValue ?? null,
         targetValue: item.targetValue ?? null,
@@ -53,6 +72,8 @@ export default function EntryDetails({
         setName(item.name);
         setDescription(item.description);
         setAssignees(item.assignees);
+        setLabelIds(item.labelIds ?? []);
+        setGoalCategory(item.goalCategory ?? 'Delivery');
         setMetric({
             currentValue: item.currentValue ?? null,
             targetValue: item.targetValue ?? null,
@@ -84,6 +105,8 @@ export default function EntryDetails({
         name,
         description,
         assignees,
+        labelIds,
+        ...(item.type === 'goal' ? { goalCategory } : {}),
         ...(item.type === 'metric' ? metric : {})
     };
     const changed = JSON.stringify(draft) !== JSON.stringify(item) || groupId !== currentGroupId;
@@ -91,11 +114,15 @@ export default function EntryDetails({
         item.type === 'goal' && parents.some((parent) => parent.type === 'goal')
             ? 'Sub-goal'
             : entryTypes[item.type].label;
+    const GoalCategoryIcon = goalCategoryIcons[goalCategory];
 
     return (
         <aside className="details" aria-label={`${typeLabel} details`}>
             <div className="panel-heading">
-                <span className={`type-badge type-${item.type}`}>{typeLabel}</span>
+                <span className={`type-badge type-${item.type}`}>
+                    {item.type === 'goal' && <GoalCategoryIcon size={14} aria-hidden="true" />}
+                    {typeLabel}
+                </span>
                 <IconButton
                     label={`Delete ${entryTypes[item.type].label.toLowerCase()}`}
                     disabled={busy}
@@ -130,8 +157,29 @@ export default function EntryDetails({
                     maxLength={500}
                     disabled={busy}
                 />
+                <LabelPicker
+                    labels={labels}
+                    value={labelIds}
+                    onChange={setLabelIds}
+                    disabled={busy}
+                />
                 {item.type === 'goal' && (
                     <React.Fragment>
+                        <label htmlFor="goal-category">Goal type</label>
+                        <select
+                            id="goal-category"
+                            value={goalCategory}
+                            disabled={busy}
+                            onChange={(event) =>
+                                setGoalCategory(event.target.value as GoalCategory)
+                            }
+                        >
+                            {goalCategories.map((category) => (
+                                <option key={category} value={category}>
+                                    {category}
+                                </option>
+                            ))}
+                        </select>
                         <label htmlFor="goal-group">Group</label>
                         <select
                             id="goal-group"
@@ -286,6 +334,17 @@ export default function EntryDetails({
                             </button>
                         </div>
                     </form>
+                </section>
+            )}
+            {labelIds.length > 0 && (
+                <section className="relationships" aria-label="Assigned labels">
+                    <h2>Labels</h2>
+                    <div className="entry-label-list">
+                        {labelIds.map((id) => {
+                            const label = labels.find((candidate) => candidate.id === id);
+                            return label ? <LabelChip key={label.id} label={label} /> : null;
+                        })}
+                    </div>
                 </section>
             )}
             <section className="relationships" aria-labelledby="parents-heading">

@@ -12,34 +12,49 @@ import {
     Plus,
     RefreshCw,
     Search,
+    Tags,
     ZoomIn,
     ZoomOut
 } from 'lucide-react';
 import IconButton from '../components/ui/IconButton';
 import CheckboxDropdown from '../components/ui/CheckboxDropdown';
+import LabelPicker from '../components/labels/LabelPicker';
 import AssigneeFilter from '../components/assignees/AssigneeFilter';
 import EntryDetails from '../features/workspace/components/EntryDetails';
 import EntryDialog from '../features/workspace/components/EntryDialog';
 import GoalList from '../features/workspace/components/GoalList';
 import ItemGraph from '../features/workspace/components/ItemGraph';
+import LabelManager from '../features/workspace/components/LabelManager';
 import {
     entryTypes,
+    goalCategories,
     matchesAssignees,
     moveGoalToGroup,
     moveListEntry
 } from '../features/workspace/model/entries';
 import { callWorkspace, isPreview } from '../services/workspace';
-import type { Assignee, EntryType, ViewMode, WorkspaceEntry } from '../types/workspace';
+import type {
+    Assignee,
+    EntryType,
+    GoalCategory,
+    ViewMode,
+    WorkspaceEntry,
+    WorkspaceLabel
+} from '../types/workspace';
 import type { GraphHandle } from '../features/workspace/components/ItemGraph';
 import './App.css';
 
-const typeOptions = (Object.keys(entryTypes) as EntryType[]).map((type) => ({
-    value: type,
-    label: entryTypes[type].plural
-}));
+type TypeFilter = Exclude<EntryType, 'goal'> | GoalCategory;
+
+const typeOptions: { value: TypeFilter; label: string }[] = [
+    { value: 'group', label: entryTypes.group.plural },
+    ...goalCategories.map((category) => ({ value: category, label: category })),
+    { value: 'metric', label: entryTypes.metric.plural }
+];
 
 function App() {
     const [items, setItems] = useState<WorkspaceEntry[]>([]);
+    const [labels, setLabels] = useState<WorkspaceLabel[]>([]);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [mode, setMode] = useState<ViewMode>('list');
@@ -50,10 +65,11 @@ function App() {
     const [dialog, setDialog] = useState<'create' | 'delete' | null>(null);
     const [createType, setCreateType] = useState<EntryType>('group');
     const [createParentId, setCreateParentId] = useState('');
-    const [typeFilter, setTypeFilter] = useState<EntryType[]>(() =>
+    const [typeFilter, setTypeFilter] = useState<TypeFilter[]>(() =>
         typeOptions.map((option) => option.value)
     );
     const [assigneeFilter, setAssigneeFilter] = useState<Assignee[]>([]);
+    const [labelFilter, setLabelFilter] = useState<string[]>([]);
     const [reload, setReload] = useState(0);
     const graph = useRef<GraphHandle>(null);
     const saving = useRef(false);
@@ -66,6 +82,7 @@ function App() {
             .then((data) => {
                 if (cancelled) return;
                 setItems(data.items);
+                setLabels(data.labels ?? []);
                 setUpdatedAt(data.updatedAt);
                 setSelectedId((current) =>
                     data.items.some((item) => item.id === current) ? current : null
@@ -85,14 +102,18 @@ function App() {
         };
     }, [reload]);
 
-    async function save(nextItems: WorkspaceEntry[]): Promise<boolean> {
+    async function save(
+        nextItems: WorkspaceEntry[],
+        nextLabels: WorkspaceLabel[] = labels
+    ): Promise<boolean> {
         if (saving.current) return false;
         saving.current = true;
         setBusy(true);
         setError('');
         try {
-            const data = await callWorkspace('saveGraph', { items: nextItems });
+            const data = await callWorkspace('saveGraph', { items: nextItems, labels: nextLabels });
             setItems(data.items);
+            setLabels(data.labels);
             setUpdatedAt(data.updatedAt);
             return true;
         } catch {
@@ -109,15 +130,22 @@ function App() {
     const selected = items.find((item) => item.id === selectedId);
     const visibleItems = items.filter(
         (item) =>
-            typeFilter.includes(item.type) &&
+            (item.type === 'goal'
+                ? typeFilter.includes(item.goalCategory ?? 'Delivery')
+                : typeFilter.includes(item.type)) &&
             matchesAssignees(item, assigneeFilter) &&
+            (labelFilter.length === 0 ||
+                (item.labelIds ?? []).some((id) => labelFilter.includes(id))) &&
             `${item.name} ${item.description} ${item.assignees.map((user) => user.displayName).join(' ')}`
                 .toLowerCase()
                 .includes(search.toLowerCase())
     );
     const relationshipItems = items.filter((item) => item.type !== 'group');
     const filtered =
-        assigneeFilter.length > 0 || typeFilter.length !== typeOptions.length || search.length > 0;
+        assigneeFilter.length > 0 ||
+        typeFilter.length !== typeOptions.length ||
+        labelFilter.length > 0 ||
+        search.length > 0;
     const listCountLabel = `${visibleItems.length} ${filtered ? (visibleItems.length === 1 ? 'match' : 'matches') : visibleItems.length === 1 ? 'entry' : 'entries'}`;
     const connections = relationshipItems.reduce((total, item) => total + item.childIds.length, 0);
     const workspaceAssignees = [
@@ -225,10 +253,22 @@ function App() {
                                 <ListTree size={16} />
                                 Tree
                             </button>
+                            <button
+                                type="button"
+                                aria-pressed={mode === 'labels'}
+                                onClick={() => setMode('labels')}
+                            >
+                                <Tags size={16} />
+                                Labels
+                            </button>
                         </div>
                         <div className="view-toolbar-actions">
                             <span className="connection-count">
-                                {mode === 'list' ? listCountLabel : `${connections} relationships`}
+                                {mode === 'list'
+                                    ? listCountLabel
+                                    : mode === 'labels'
+                                      ? `${labels.length} labels`
+                                      : `${connections} relationships`}
                             </span>
                             <IconButton
                                 label="Refresh workspace"
@@ -239,7 +279,27 @@ function App() {
                             </IconButton>
                         </div>
                     </div>
-                    {mode === 'list' ? (
+                    {mode === 'labels' ? (
+                        <LabelManager
+                            labels={labels}
+                            busy={busy}
+                            onSave={async (nextLabels) => {
+                                const knownIds = new Set(nextLabels.map((label) => label.id));
+                                const nextItems = items.map((entry) => ({
+                                    ...entry,
+                                    labelIds: (entry.labelIds ?? []).filter((id) =>
+                                        knownIds.has(id)
+                                    )
+                                }));
+                                const saved = await save(nextItems, nextLabels);
+                                if (saved)
+                                    setLabelFilter((current) =>
+                                        current.filter((id) => knownIds.has(id))
+                                    );
+                                return saved;
+                            }}
+                        />
+                    ) : mode === 'list' ? (
                         <div className="list-workspace">
                             <div className="list-heading">
                                 <h2>Goals</h2>
@@ -267,6 +327,12 @@ function App() {
                                         value={assigneeFilter}
                                         onChange={setAssigneeFilter}
                                     />
+                                    <LabelPicker
+                                        labels={labels}
+                                        value={labelFilter}
+                                        onChange={setLabelFilter}
+                                        label="Filter by label"
+                                    />
                                 </div>
                             </div>
                             {loading ? (
@@ -277,6 +343,7 @@ function App() {
                             ) : (
                                 <GoalList
                                     items={items}
+                                    labels={labels}
                                     entries={visibleItems}
                                     selectedId={selectedId}
                                     busy={busy}
@@ -362,6 +429,7 @@ function App() {
                         key={selected.id}
                         item={selected}
                         items={items}
+                        labels={labels}
                         busy={busy || loading}
                         onSave={(updated, groupId) => {
                             const nextItems = items.map((item) =>
@@ -399,6 +467,7 @@ function App() {
                     kind={dialog}
                     item={selected}
                     items={items}
+                    labels={labels}
                     initialType={createType}
                     initialParentId={createParentId}
                     busy={busy}

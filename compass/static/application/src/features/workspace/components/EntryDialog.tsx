@@ -2,15 +2,24 @@ import React, { useEffect, useRef, useState } from 'react';
 import { LoaderCircle, X } from 'lucide-react';
 import IconButton from '../../../components/ui/IconButton';
 import AssigneePicker from '../../../components/assignees/AssigneePicker';
+import LabelPicker from '../../../components/labels/LabelPicker';
 import MetricFields from './MetricFields';
 import type { MetricValues } from './MetricFields';
-import { canContain, entryTypes } from '../model/entries';
-import type { Assignee, EntryDraft, EntryType, WorkspaceEntry } from '../../../types/workspace';
+import { canContain, entryTypes, goalCategories } from '../model/entries';
+import type {
+    Assignee,
+    EntryDraft,
+    EntryType,
+    GoalCategory,
+    WorkspaceEntry,
+    WorkspaceLabel
+} from '../../../types/workspace';
 
 interface EntryDialogProps {
     kind: 'create' | 'delete';
     item?: WorkspaceEntry;
     items: WorkspaceEntry[];
+    labels: WorkspaceLabel[];
     initialType: EntryType;
     initialParentId: string;
     busy: boolean;
@@ -23,6 +32,7 @@ export default function EntryDialog({
     kind,
     item,
     items,
+    labels,
     initialType,
     initialParentId,
     busy,
@@ -36,6 +46,8 @@ export default function EntryDialog({
     const [type, setType] = useState(initialType);
     const [parentId, setParentId] = useState(initialParentId);
     const [assignees, setAssignees] = useState<Assignee[]>([]);
+    const [labelIds, setLabelIds] = useState<string[]>([]);
+    const [goalCategory, setGoalCategory] = useState<GoalCategory>('Delivery');
     const [metric, setMetric] = useState<MetricValues>({
         currentValue: 0,
         targetValue: 100,
@@ -77,6 +89,8 @@ export default function EntryDialog({
                                 name,
                                 description,
                                 assignees: type === 'group' ? [] : assignees,
+                                labelIds,
+                                ...(type === 'goal' ? { goalCategory } : {}),
                                 ...(type === 'metric' ? metric : {})
                             },
                             validParentId
@@ -153,6 +167,31 @@ export default function EntryDialog({
                             onChange={(event) => setName(event.target.value)}
                             disabled={busy}
                         />
+                        <LabelPicker
+                            labels={labels}
+                            value={labelIds}
+                            onChange={setLabelIds}
+                            disabled={busy}
+                        />
+                        {type === 'goal' && (
+                            <React.Fragment>
+                                <label htmlFor="new-goal-category">Goal type</label>
+                                <select
+                                    id="new-goal-category"
+                                    value={goalCategory}
+                                    disabled={busy}
+                                    onChange={(event) =>
+                                        setGoalCategory(event.target.value as GoalCategory)
+                                    }
+                                >
+                                    {goalCategories.map((category) => (
+                                        <option key={category} value={category}>
+                                            {category}
+                                        </option>
+                                    ))}
+                                </select>
+                            </React.Fragment>
+                        )}
                         {type === 'metric' && (
                             <MetricFields
                                 value={metric}

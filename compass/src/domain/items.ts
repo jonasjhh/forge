@@ -1,4 +1,12 @@
-import type { Assignee, Graph, WorkspaceEntry } from '../../shared/workspace';
+import type {
+    Assignee,
+    GoalCategory,
+    Graph,
+    WorkspaceEntry,
+    WorkspaceLabel
+} from '../../shared/workspace';
+
+const goalCategories: GoalCategory[] = ['Decision', 'Capability', 'Delivery'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null;
@@ -9,6 +17,8 @@ export function validateGraph(payload: unknown): Graph {
         throw new Error('A workspace can contain up to 100 items.');
     }
 
+    const labels = validateLabels(payload.labels ?? []);
+    const labelIds = new Set(labels.map((label) => label.id));
     const items = payload.items.map((item: unknown): WorkspaceEntry => {
         if (
             !isRecord(item) ||
@@ -32,9 +42,30 @@ export function validateGraph(payload: unknown): Graph {
         if (new Set(item.childIds).size !== item.childIds.length) {
             throw new Error('An item cannot have duplicate connections.');
         }
+        const itemLabelIds = item.labelIds ?? [];
+        if (
+            !Array.isArray(itemLabelIds) ||
+            itemLabelIds.some((labelId) => typeof labelId !== 'string')
+        ) {
+            throw new Error('Labels must reference label IDs.');
+        }
+        if (new Set(itemLabelIds).size !== itemLabelIds.length || itemLabelIds.length > 20) {
+            throw new Error('An item can have up to 20 unique labels.');
+        }
+        if (itemLabelIds.some((labelId) => !labelIds.has(labelId))) {
+            throw new Error('An item references a label that does not exist.');
+        }
         const type = item.type;
         if (type !== 'group' && type !== 'goal' && type !== 'metric') {
             throw new Error('Entries must be groups, goals, or metrics.');
+        }
+        const goalCategory = type === 'goal' ? (item.goalCategory ?? 'Delivery') : undefined;
+        if (
+            type === 'goal' &&
+            (typeof goalCategory !== 'string' ||
+                !goalCategories.includes(goalCategory as GoalCategory))
+        ) {
+            throw new Error('Goals must use Decision, Capability, or Delivery as their category.');
         }
         const assignees = item.assignees ?? [];
         if (!Array.isArray(assignees) || assignees.length > 20) {
@@ -123,6 +154,8 @@ export function validateGraph(payload: unknown): Graph {
             description: item.description.trim(),
             childIds: [...item.childIds],
             assignees: normalizedAssignees,
+            labelIds: [...itemLabelIds] as string[],
+            ...(type === 'goal' ? { goalCategory: goalCategory as GoalCategory } : {}),
             ...metric
         };
     });
@@ -164,5 +197,34 @@ export function validateGraph(payload: unknown): Graph {
     if (Buffer.byteLength(JSON.stringify({ items }), 'utf8') > 200 * 1024) {
         throw new Error('The workspace exceeds the 200 KB storage limit.');
     }
-    return { items };
+    return { items, labels };
+}
+
+function validateLabels(value: unknown): WorkspaceLabel[] {
+    if (!Array.isArray(value) || value.length > 100) {
+        throw new Error('A workspace can contain up to 100 labels.');
+    }
+    const labels = value.map((label: unknown): WorkspaceLabel => {
+        if (
+            !isRecord(label) ||
+            typeof label.id !== 'string' ||
+            !/^[a-zA-Z0-9-]{1,80}$/.test(label.id)
+        ) {
+            throw new Error('Every label needs a valid ID.');
+        }
+        if (typeof label.name !== 'string' || !label.name.trim() || label.name.trim().length > 50) {
+            throw new Error('Label names must contain between 1 and 50 characters.');
+        }
+        if (typeof label.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(label.color)) {
+            throw new Error('Label colors must be six-digit hexadecimal colors.');
+        }
+        return { id: label.id, name: label.name.trim(), color: label.color.toLowerCase() };
+    });
+    if (new Set(labels.map((label) => label.id)).size !== labels.length) {
+        throw new Error('Label IDs must be unique.');
+    }
+    if (new Set(labels.map((label) => label.name.toLowerCase())).size !== labels.length) {
+        throw new Error('Label names must be unique.');
+    }
+    return labels;
 }

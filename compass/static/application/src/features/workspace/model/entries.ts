@@ -15,6 +15,8 @@ export const entryTypes: Record<
     metric: { label: 'Metric', plural: 'Metrics', color: '#fff7d6', border: '#946f00' }
 };
 
+export const goalCategories = ['Decision', 'Capability', 'Delivery'] as const;
+
 export function matchesAssignees(
     entry: Pick<WorkspaceEntry, 'assignees'>,
     selectedAssignees: Assignee[]

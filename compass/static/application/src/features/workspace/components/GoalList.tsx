@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { ChevronRight, Folder as GroupIcon, Gauge, GripVertical, Target } from 'lucide-react';
+import {
+    ChevronRight,
+    Folder as GroupIcon,
+    Gauge,
+    GitBranch,
+    GripVertical,
+    Layers,
+    Rocket,
+    Target
+} from 'lucide-react';
 import {
     closestCenter,
     DndContext,
@@ -12,13 +21,21 @@ import {
 } from '@dnd-kit/core';
 import { buildListRows, entryTypes } from '../model/entries';
 import AssigneeChip from '../../../components/assignees/AssigneeChip';
+import LabelChip from '../../../components/labels/LabelChip';
 import DraggableListRow from './DraggableListRow';
 import type { CollisionDetection, DragEndEvent } from '@dnd-kit/core';
 import type { DragEntryData, DropTargetData } from './DraggableListRow';
-import type { DropPlacement, WorkspaceEntry } from '../../../types/workspace';
+import type { DropPlacement, WorkspaceEntry, WorkspaceLabel } from '../../../types/workspace';
+
+const goalCategoryIcons = {
+    Decision: GitBranch,
+    Capability: Layers,
+    Delivery: Rocket
+};
 
 interface GoalListProps {
     items: WorkspaceEntry[];
+    labels: WorkspaceLabel[];
     entries: WorkspaceEntry[];
     selectedId: string | null;
     busy: boolean;
@@ -36,6 +53,7 @@ const listCollisionDetection: CollisionDetection = (args) => {
 
 export default function GoalList({
     items,
+    labels,
     entries,
     selectedId,
     busy,
@@ -120,6 +138,9 @@ export default function GoalList({
                             <th scope="col" className="column-assignees">
                                 Assignees
                             </th>
+                            <th scope="col" className="column-labels">
+                                Labels
+                            </th>
                             <th scope="col" className="column-parents">
                                 Parent goals
                             </th>
@@ -140,20 +161,23 @@ export default function GoalList({
                                     candidate.type === 'metric' &&
                                     entry.childIds.includes(candidate.id)
                             );
+                            const goalCategory = entry.goalCategory ?? 'Delivery';
                             const label =
                                 entry.type === 'group'
                                     ? 'Group'
                                     : entry.type === 'metric'
                                       ? 'Metric'
-                                      : parents.length
-                                        ? 'Sub-goal'
-                                        : 'Goal';
+                                      : goalCategory;
                             const EntryIcon =
                                 entry.type === 'group'
                                     ? GroupIcon
                                     : entry.type === 'metric'
                                       ? Gauge
-                                      : Target;
+                                      : goalCategoryIcons[goalCategory];
+                            const iconClass =
+                                entry.type === 'goal'
+                                    ? `entry-icon-${goalCategory.toLowerCase()}`
+                                    : `entry-icon-${entry.type}`;
                             return (
                                 <DraggableListRow
                                     key={path}
@@ -202,7 +226,7 @@ export default function GoalList({
                                                     >
                                                         <EntryIcon
                                                             size={17}
-                                                            className={`entry-icon-${entry.type}`}
+                                                            className={iconClass}
                                                         />
                                                         <span>
                                                             <span className="goal-name-text">
@@ -234,6 +258,21 @@ export default function GoalList({
                                                                 : 'Unassigned'}
                                                         </span>
                                                     )}
+                                                </div>
+                                            </td>
+                                            <td className="column-labels">
+                                                <div className="table-labels">
+                                                    {(entry.labelIds ?? []).map((id) => {
+                                                        const label = labels.find(
+                                                            (candidate) => candidate.id === id
+                                                        );
+                                                        return label ? (
+                                                            <LabelChip
+                                                                key={label.id}
+                                                                label={label}
+                                                            />
+                                                        ) : null;
+                                                    })}
                                                 </div>
                                             </td>
                                             <td className="column-parents">

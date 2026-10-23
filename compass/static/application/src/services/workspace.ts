@@ -15,14 +15,23 @@ export async function callWorkspace(
         return 'body' in response ? response.body : response;
     }
     if (operation === 'getGraph') {
-        const graph: SavedGraph = JSON.parse(
+        const stored: SavedGraph = JSON.parse(
             localStorage.getItem(previewKey) || '{"items":[],"updatedAt":null}'
         );
-        return graph;
+        return {
+            ...stored,
+            labels: stored.labels ?? [],
+            items: stored.items.map((entry) => ({
+                ...entry,
+                labelIds: entry.labelIds ?? [],
+                ...(entry.type === 'goal' ? { goalCategory: entry.goalCategory ?? 'Delivery' } : {})
+            }))
+        };
     }
     if (!payload) throw new Error('Workspace data is required.');
     const graph: SavedGraph = {
         items: payload.items,
+        labels: payload.labels,
         updatedAt: new Date().toISOString()
     };
     localStorage.setItem(previewKey, JSON.stringify(graph));

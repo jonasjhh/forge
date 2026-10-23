@@ -5,6 +5,7 @@ import './ui.css';
 interface CheckboxOption<Value extends string> {
     value: Value;
     label: string;
+    color?: string;
 }
 
 interface CheckboxDropdownProps<Value extends string> {
@@ -14,6 +15,7 @@ interface CheckboxDropdownProps<Value extends string> {
     options: readonly CheckboxOption<Value>[];
     value: Value[];
     onChange: (value: Value[]) => void;
+    disabled?: boolean;
 }
 
 export default function CheckboxDropdown<Value extends string>({
@@ -22,7 +24,8 @@ export default function CheckboxDropdown<Value extends string>({
     emptyLabel,
     options,
     value,
-    onChange
+    onChange,
+    disabled = false
 }: CheckboxDropdownProps<Value>) {
     const details = useRef<HTMLDetailsElement>(null);
     const selectAll = useRef<HTMLInputElement>(null);
@@ -68,6 +71,8 @@ export default function CheckboxDropdown<Value extends string>({
             <summary
                 className={`button secondary ${allSelected ? '' : 'filter-active'}`}
                 aria-label={label}
+                aria-disabled={disabled}
+                tabIndex={disabled ? -1 : 0}
             >
                 <ListFilter size={16} />
                 <span>{summary}</span>
@@ -81,6 +86,7 @@ export default function CheckboxDropdown<Value extends string>({
                         type="checkbox"
                         value="all"
                         checked={allSelected}
+                        disabled={disabled}
                         onChange={(event) =>
                             onChange(
                                 event.currentTarget.checked
@@ -97,6 +103,7 @@ export default function CheckboxDropdown<Value extends string>({
                             type="checkbox"
                             value={option.value}
                             checked={value.includes(option.value)}
+                            disabled={disabled}
                             onChange={(event) =>
                                 onChange(
                                     event.currentTarget.checked
@@ -107,6 +114,12 @@ export default function CheckboxDropdown<Value extends string>({
                                 )
                             }
                         />
+                        {option.color && (
+                            <span
+                                className="checkbox-option-swatch"
+                                style={{ '--option-color': option.color } as React.CSSProperties}
+                            />
+                        )}
                         <span>{option.label}</span>
                     </label>
                 ))}

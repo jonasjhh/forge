@@ -10,10 +10,20 @@ const graph: SavedGraph = {
             name: 'Strategy',
             description: '',
             childIds: ['goal'],
-            assignees: []
+            assignees: [],
+            labelIds: []
         },
-        { id: 'goal', type: 'goal', name: 'Goal', description: '', childIds: [], assignees: [] }
+        {
+            id: 'goal',
+            type: 'goal',
+            name: 'Goal',
+            description: '',
+            childIds: [],
+            assignees: [],
+            labelIds: []
+        }
     ],
+    labels: [],
     updatedAt: '2026-10-22T00:00:00.000Z',
     updatedBy: 'original-editor'
 };
@@ -36,12 +46,15 @@ test('given saved preview data, repeated loading preserves the graph and does no
     expect(first.updatedBy).toBe(graph.updatedBy);
     expect(JSON.parse(localStorage.getItem(key)!).items[0].type).toBe('group');
     expect(second).toEqual(first);
-    expect(first).toEqual(graph);
+    expect(first).toEqual({
+        ...graph,
+        items: [graph.items[0], { ...graph.items[1], goalCategory: 'Delivery' }]
+    });
     expect(write).not.toHaveBeenCalled();
 });
 
 test('given canonical preview data, saving persists its entries and returns the saved graph', async () => {
-    const saved = await callWorkspace('saveGraph', { items: graph.items });
+    const saved = await callWorkspace('saveGraph', { items: graph.items, labels: graph.labels });
     expect(saved.items).toEqual(graph.items);
     expect(saved.updatedAt).toEqual(expect.any(String));
     expect(JSON.parse(localStorage.getItem(key)!)).toEqual(saved);
@@ -49,7 +62,7 @@ test('given canonical preview data, saving persists its entries and returns the 
 
 test('given no preview record, loading does not create one', async () => {
     const write = jest.spyOn(Storage.prototype, 'setItem');
-    expect(await callWorkspace('getGraph')).toEqual({ items: [], updatedAt: null });
+    expect(await callWorkspace('getGraph')).toEqual({ items: [], labels: [], updatedAt: null });
     expect(write).not.toHaveBeenCalled();
 });
 
@@ -57,7 +70,7 @@ test('given a storage write failure, preview saving rejects', async () => {
     jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
         throw new Error('Storage unavailable');
     });
-    await expect(callWorkspace('saveGraph', { items: graph.items })).rejects.toThrow(
-        'Storage unavailable'
-    );
+    await expect(
+        callWorkspace('saveGraph', { items: graph.items, labels: graph.labels })
+    ).rejects.toThrow('Storage unavailable');
 });

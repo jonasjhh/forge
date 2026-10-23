@@ -12,7 +12,7 @@ export function workspaceKey(context: WorkspaceContext | undefined): string {
 
 export async function loadWorkspace(storage: WorkspaceStorage, key: string): Promise<SavedGraph> {
     const stored = await storage.get(key);
-    if (stored === undefined || stored === null) return { items: [], updatedAt: null };
+    if (stored === undefined || stored === null) return { items: [], labels: [], updatedAt: null };
     const validated = validateGraph(stored);
     const metadata = stored as SavedGraph;
     const graph: SavedGraph = { ...metadata, ...validated, updatedAt: metadata.updatedAt ?? null };

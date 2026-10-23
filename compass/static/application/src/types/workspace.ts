@@ -3,10 +3,12 @@ export type {
     DropPlacement,
     EntryDraft,
     EntryType,
+    GoalCategory,
     Graph,
     ListRow,
     SavedGraph,
     ViewMode,
     WorkspaceApi,
-    WorkspaceEntry
+    WorkspaceEntry,
+    WorkspaceLabel
 } from '../../../../shared/workspace';

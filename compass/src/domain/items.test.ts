@@ -8,18 +8,20 @@ const item = (id: string, childIds: unknown[] = [], type = 'group') => ({
     name: id,
     description: '',
     childIds,
-    assignees: []
+    assignees: [],
+    labelIds: [],
+    ...(type === 'goal' ? { goalCategory: 'Delivery' } : {})
 });
 
 test('given a new workspace, an empty graph is accepted', () => {
-    assert.deepEqual(validateGraph({ items: [] }), { items: [] });
+    assert.deepEqual(validateGraph({ items: [] }), { items: [], labels: [] });
 });
 
 test('given multiple parents, a shared child is accepted', () => {
     const graph = {
         items: [item('project', ['service']), item('team', ['service']), item('service')]
     };
-    assert.deepEqual(validateGraph(graph), graph);
+    assert.deepEqual(validateGraph(graph), { ...graph, labels: [] });
 });
 
 test('given whitespace and untrusted fields, saved items are normalized', () => {
@@ -29,7 +31,8 @@ test('given whitespace and untrusted fields, saved items are normalized', () => 
         ]
     };
     assert.deepEqual(validateGraph(graph), {
-        items: [{ ...item('service'), name: 'Service', description: 'Notes' }]
+        items: [{ ...item('service'), name: 'Service', description: 'Notes' }],
+        labels: []
     });
 });
 
@@ -137,7 +140,7 @@ test('given groups, nested goals and a metric, the hierarchy is accepted', () =>
             metric
         ]
     };
-    assert.deepEqual(validateGraph(graph), graph);
+    assert.deepEqual(validateGraph(graph), { ...graph, labels: [] });
 });
 
 test('given a metric directly in a group, the hierarchy is rejected', () => {
@@ -234,7 +237,7 @@ test('given an unknown type, the entry is rejected', () => {
 
 test('given a standalone goal with no metrics, it is accepted without a group or parent', () => {
     const graph = { items: [item('independent', [], 'goal')] };
-    assert.deepEqual(validateGraph(graph), graph);
+    assert.deepEqual(validateGraph(graph), { ...graph, labels: [] });
 });
 
 test('given a Jira assignee avatar, its approved URL is persisted', () => {
@@ -285,6 +288,74 @@ test('given an unapproved avatar host, the assignee is rejected', () => {
     );
 });
 
+test('given valid labels, colors are normalized and item assignments are preserved', () => {
+    const graph = validateGraph({
+        labels: [{ id: 'team', name: ' Team ', color: '#AABBCC' }],
+        items: [{ ...item('goal', [], 'goal'), labelIds: ['team'] }]
+    });
+    assert.deepEqual(graph.labels, [{ id: 'team', name: 'Team', color: '#aabbcc' }]);
+    assert.deepEqual(graph.items[0].labelIds, ['team']);
+});
+
+test('given an item assigned to an unknown label, the graph is rejected', () => {
+    assert.throws(
+        () => validateGraph({ items: [{ ...item('goal', [], 'goal'), labelIds: ['unknown'] }] }),
+        /label that does not exist/
+    );
+});
+
+test('given a non-hex label color, the graph is rejected', () => {
+    assert.throws(
+        () => validateGraph({ labels: [{ id: 'team', name: 'Team', color: 'red' }], items: [] }),
+        /six-digit hexadecimal/
+    );
+});
+
+test('given case-insensitive duplicate label names, the graph is rejected', () => {
+    assert.throws(
+        () =>
+            validateGraph({
+                labels: [
+                    { id: 'one', name: 'Team', color: '#112233' },
+                    { id: 'two', name: 'team', color: '#445566' }
+                ],
+                items: []
+            }),
+        /Label names must be unique/
+    );
+});
+
+test('given entries without label assignments, validation supplies an empty assignment list', () => {
+    const graph = validateGraph({ items: [{ ...item('goal', [], 'goal'), labelIds: undefined }] });
+    assert.deepEqual(graph.items[0].labelIds, []);
+});
+
+test('given a legacy goal without a category, validation defaults it to Delivery', () => {
+    const legacyGoal = { ...item('goal', [], 'goal'), goalCategory: undefined };
+    assert.equal(validateGraph({ items: [legacyGoal] }).items[0].goalCategory, 'Delivery');
+});
+
+test('given an unsupported goal category, the graph is rejected', () => {
+    assert.throws(
+        () =>
+            validateGraph({
+                items: [{ ...item('goal', [], 'goal'), goalCategory: 'Strategy' }]
+            }),
+        /Decision, Capability, or Delivery/
+    );
+});
+
+test('given duplicate label IDs on an item, the graph is rejected', () => {
+    assert.throws(
+        () =>
+            validateGraph({
+                labels: [{ id: 'team', name: 'Team', color: '#112233' }],
+                items: [{ ...item('goal', [], 'goal'), labelIds: ['team', 'team'] }]
+            }),
+        /unique labels/
+    );
+});
+
 test('given a shared nested goal and multiple metrics, every parent relationship is accepted', () => {
     const graph = {
         items: [
@@ -301,5 +372,5 @@ test('given a shared nested goal and multiple metrics, every parent relationship
             }
         ]
     };
-    assert.deepEqual(validateGraph(graph), graph);
+    assert.deepEqual(validateGraph(graph), { ...graph, labels: [] });
 });

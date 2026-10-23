@@ -24,10 +24,20 @@ const workspace: SavedGraph = {
             name: 'Strategy',
             description: '',
             childIds: ['goal'],
-            assignees: []
+            assignees: [],
+            labelIds: []
         },
-        { id: 'goal', type: 'goal', name: 'Goal', description: '', childIds: [], assignees: [] }
+        {
+            id: 'goal',
+            type: 'goal',
+            name: 'Goal',
+            description: '',
+            childIds: [],
+            assignees: [],
+            labelIds: []
+        }
     ],
+    labels: [],
     updatedAt: '2026-10-22T00:00:00.000Z',
     updatedBy: 'original-editor'
 };
@@ -54,12 +64,21 @@ test('given a stored graph, loading preserves data and metadata without writing'
     assert.equal(first.updatedAt, workspace.updatedAt);
     assert.equal(first.updatedBy, workspace.updatedBy);
     assert.deepEqual(second, first);
-    assert.deepEqual(first, workspace);
+    assert.deepEqual(first, {
+        ...workspace,
+        items: workspace.items.map((item) =>
+            item.type === 'goal' ? { ...item, goalCategory: 'Delivery' } : item
+        )
+    });
 });
 
 test('given an empty installation, loading does not create a storage record', async () => {
     const storage = workspaceStorage(undefined);
-    assert.deepEqual(await loadWorkspace(storage, 'shared'), { items: [], updatedAt: null });
+    assert.deepEqual(await loadWorkspace(storage, 'shared'), {
+        items: [],
+        labels: [],
+        updatedAt: null
+    });
     assert.equal(storage.writes.length, 0);
 });
 

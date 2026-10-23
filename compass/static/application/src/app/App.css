@@ -190,14 +190,17 @@
     padding-bottom: 10px;
 }
 .goal-table th:first-child {
-    width: 50%;
+    width: 40%;
     padding-left: 20px;
 }
 .goal-table .column-assignees {
-    width: 22%;
+    width: 19%;
+}
+.goal-table .column-labels {
+    width: 19%;
 }
 .goal-table .column-parents {
-    width: 20%;
+    width: 14%;
 }
 .goal-table .column-metrics {
     width: 8%;
@@ -298,7 +301,10 @@
         width: 65%;
     }
     .goal-table .column-assignees {
-        width: 25%;
+        width: 24%;
+    }
+    .goal-table .column-labels {
+        width: 18%;
     }
     .goal-table .column-metrics {
         width: 10%;
@@ -330,7 +336,10 @@
     }
     .goal-table .column-assignees {
         display: table-cell;
-        width: 35%;
+        width: 28%;
+    }
+    .goal-table .column-labels {
+        width: 22%;
     }
     .goal-table th,
     .goal-table td {
@@ -377,6 +386,15 @@
     color: #216e4e;
 }
 .entry-icon-goal {
+    color: #0055cc;
+}
+.entry-icon-decision {
+    color: #ae2a19;
+}
+.entry-icon-capability {
+    color: #216e4e;
+}
+.entry-icon-delivery {
     color: #0055cc;
 }
 .entry-icon-metric {
@@ -514,6 +532,91 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+}
+.label-manager {
+    width: min(100%, 980px);
+    margin: 0 auto;
+    padding: 28px 32px 40px;
+}
+.label-manager-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--line);
+}
+.label-manager-heading h2 {
+    margin-top: 5px;
+    font-size: 20px;
+}
+.label-manager-heading p {
+    margin-top: 8px;
+    line-height: 1.5;
+}
+.label-create-form {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) 100px auto;
+    align-items: end;
+    gap: 14px;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--line);
+}
+.label-create-form label {
+    margin: 0 0 6px;
+}
+.label-create-form input:not([type='color']),
+.label-manager-row > input {
+    width: 100%;
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--ds-border-input, #8590a2);
+    background: var(--ds-background-input, #fafbfc);
+}
+.label-create-form .button {
+    min-height: 36px;
+}
+.label-manager-table {
+    margin-top: 16px;
+}
+.label-manager-column-head,
+.label-manager-row {
+    display: grid;
+    grid-template-columns: minmax(160px, 1fr) minmax(180px, 1fr) 36px;
+    align-items: center;
+    gap: 16px;
+}
+.label-manager-column-head {
+    padding: 8px 12px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+}
+.label-manager-row {
+    min-height: 58px;
+    padding: 8px 12px;
+    border-top: 1px solid var(--line);
+}
+.label-preview-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+.label-preview-control .workspace-label-chip {
+    min-width: 0;
+}
+.label-manager-empty {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 18px 12px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12px;
+}
+.label-manager .dialog-error {
+    margin-top: 12px;
 }
 .graph-toolbar {
     display: flex;
@@ -847,6 +950,35 @@ select:focus {
     }
     .graph-toolbar {
         padding: 10px 14px;
+    }
+    .label-manager {
+        padding: 22px 16px 32px;
+    }
+    .label-manager-heading {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 16px;
+    }
+    .label-create-form {
+        grid-template-columns: minmax(0, 1fr) 52px;
+        gap: 12px;
+    }
+    .label-create-form .button {
+        grid-column: 1 / -1;
+        justify-content: center;
+    }
+    .label-manager-column-head,
+    .label-manager-row {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 32px;
+        gap: 8px;
+        padding-right: 4px;
+        padding-left: 4px;
+    }
+    .label-preview-control {
+        gap: 6px;
+    }
+    .label-preview-control .workspace-label-chip {
+        font-size: 10px;
     }
     .graph-surface {
         flex: none;

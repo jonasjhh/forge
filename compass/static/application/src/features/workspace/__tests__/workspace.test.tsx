@@ -27,10 +27,10 @@ test('given several selected assignees, entries matching any selected account ar
     );
 });
 
-test('given the type dropdown, checkboxes select multiple types and retain only matching ancestor chains', async () => {
+test('given the type dropdown, goal categories filter separately and retain matching ancestor chains', async () => {
     const items = [
         entryFixture({ id: 'group', type: 'group', childIds: ['goal'] }),
-        entryFixture({ id: 'goal', type: 'goal', childIds: ['metric'] }),
+        entryFixture({ id: 'goal', type: 'goal', goalCategory: 'Decision', childIds: ['metric'] }),
         entryFixture({ id: 'metric', type: 'metric' }),
         entryFixture({ id: 'empty-group', type: 'group' })
     ];
@@ -50,7 +50,7 @@ test('given the type dropdown, checkboxes select multiple types and retain only 
 
     expect(checkbox('all').checked).toBe(true);
     setChecked('group', false);
-    expect(checkbox('goal').checked).toBe(true);
+    expect(checkbox('Decision').checked).toBe(true);
     expect(checkbox('metric').checked).toBe(true);
     expect(checkbox('all').indeterminate).toBe(true);
     expect(
@@ -58,7 +58,7 @@ test('given the type dropdown, checkboxes select multiple types and retain only 
     ).toEqual(['group', 'goal', 'metric']);
     expect(required(container.querySelector('.connection-count')).textContent).toBe('2 matches');
 
-    setChecked('goal', false);
+    setChecked('Decision', false);
     expect(required(container.querySelector('.connection-count')).textContent).toBe('1 match');
     expect(
         [...container.querySelectorAll<HTMLElement>('.entry-row')].map((row) => row.dataset.entryId)
@@ -70,6 +70,178 @@ test('given the type dropdown, checkboxes select multiple types and retain only 
     setChecked('all', true);
     expect(container.querySelector('[data-entry-id="empty-group"]')).not.toBeNull();
     expect(required(container.querySelector('.connection-count')).textContent).toBe('4 entries');
+});
+
+test('given a goal category, creating and changing it updates the list label and icon', async () => {
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    act(() => {
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('.header-actions button')].find(
+                    (button) => button.textContent?.includes('New goal')
+                )
+            )
+        );
+    });
+    act(() => {
+        changeValue(required(container.querySelector('#new-name')), 'Decision plan');
+        changeValue(required(container.querySelector('#new-goal-category')), 'Capability');
+    });
+    await act(async () => {
+        Simulate.submit(required(container.querySelector('dialog form')));
+    });
+
+    const created = required(savedGraph().items.find((item) => item.id === 'created-entry'));
+    expect(created.goalCategory).toBe('Capability');
+    const createdRow = required(container.querySelector('[data-entry-id="created-entry"]'));
+    expect(createdRow.querySelector('.goal-row-meta')?.textContent).toBe('Capability');
+    expect(createdRow.querySelector('.entry-icon-capability')).not.toBeNull();
+
+    act(() => {
+        Simulate.click(required(container.querySelector('[aria-label="Open goal Decision plan"]')));
+        changeValue(required(container.querySelector('#goal-category')), 'Decision');
+    });
+    await act(async () => {
+        Simulate.submit(required(container.querySelector('.details form')));
+    });
+
+    const updated = required(savedGraph().items.find((item) => item.id === 'created-entry'));
+    expect(updated.goalCategory).toBe('Decision');
+    const updatedRow = required(container.querySelector('[data-entry-id="created-entry"]'));
+    expect(updatedRow.querySelector('.goal-row-meta')?.textContent).toBe('Decision');
+    expect(updatedRow.querySelector('.entry-icon-decision')).not.toBeNull();
+
+    const typeFilter = required(
+        container.querySelector<HTMLDetailsElement>('.list-filters .checkbox-dropdown')
+    );
+    expect(typeFilter.querySelector('input[value="Decision"]')).not.toBeNull();
+    expect(typeFilter.querySelector('input[value="Capability"]')).not.toBeNull();
+    expect(typeFilter.querySelector('input[value="Delivery"]')).not.toBeNull();
+});
+
+test('given a workspace label, it can be created, assigned, filtered, and removed cleanly', async () => {
+    localStorage.setItem(
+        'compass-preview-v1',
+        JSON.stringify({
+            items: [
+                entryFixture({ id: 'group', name: 'Workspace', childIds: ['goal'] }),
+                entryFixture({ id: 'goal', type: 'goal', name: 'Platform' }),
+                entryFixture({ id: 'other', name: 'Other group' })
+            ],
+            labels: [],
+            updatedAt: null
+        })
+    );
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+
+    act(() => {
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].find(
+                    (button) => button.textContent?.trim() === 'Labels'
+                )
+            )
+        );
+    });
+    act(() => changeValue(required(container.querySelector('#new-label-name')), 'Platform team'));
+    act(() => {
+        Simulate.submit(required(container.querySelector('.label-create-form')));
+    });
+    await act(async () => {
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+                    (button) => button.textContent?.trim() === 'Save labels'
+                )
+            )
+        );
+    });
+    expect(savedGraph().labels).toEqual([
+        { id: 'created-entry', name: 'Platform team', color: '#0c66e4' }
+    ]);
+
+    act(() => {
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].find(
+                    (button) => button.textContent?.trim() === 'List'
+                )
+            )
+        );
+    });
+    act(() => {
+        Simulate.click(required(container.querySelector('[aria-label="Open goal Platform"]')));
+    });
+    const detailLabels = required(
+        container.querySelector<HTMLDetailsElement>('.details .checkbox-dropdown')
+    );
+    act(() => {
+        detailLabels.open = true;
+        Simulate.toggle(detailLabels);
+        const checkbox = required(
+            detailLabels.querySelector<HTMLInputElement>('input[value="created-entry"]')
+        );
+        checkbox.checked = true;
+        Simulate.change(checkbox);
+    });
+    await act(async () => {
+        Simulate.submit(required(container.querySelector('.details form')));
+    });
+    expect(required(savedGraph().items.find((entry) => entry.id === 'goal')).labelIds).toEqual([
+        'created-entry'
+    ]);
+    expect(
+        container.querySelector('.entry-row[data-entry-id="goal"] .workspace-label-chip')
+            ?.textContent
+    ).toBe('Platform team');
+
+    const labelFilter = required(
+        [
+            ...container.querySelectorAll<HTMLDetailsElement>('.list-filters .checkbox-dropdown')
+        ].find((dropdown) => dropdown.querySelector('summary[aria-label="Filter by label"]'))
+    );
+    act(() => {
+        labelFilter.open = true;
+        Simulate.toggle(labelFilter);
+        const checkbox = required(
+            labelFilter.querySelector<HTMLInputElement>('input[value="created-entry"]')
+        );
+        checkbox.checked = true;
+        Simulate.change(checkbox);
+    });
+    expect(
+        [...container.querySelectorAll<HTMLElement>('.entry-row')].map((row) => row.dataset.entryId)
+    ).toEqual(['group', 'goal']);
+
+    act(() => {
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].find(
+                    (button) => button.textContent?.trim() === 'Labels'
+                )
+            )
+        );
+    });
+    act(() => {
+        Simulate.click(
+            required(container.querySelector('[aria-label="Remove label Platform team"]'))
+        );
+    });
+    await act(async () => {
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+                    (button) => button.textContent?.trim() === 'Save labels'
+                )
+            )
+        );
+    });
+    expect(savedGraph().labels).toEqual([]);
+    expect(required(savedGraph().items.find((entry) => entry.id === 'goal')).labelIds).toEqual([]);
 });
 
 test('given the assignee filter, selecting people uses OR matching and clear all restores unrelated rows', async () => {
@@ -407,7 +579,9 @@ function entryFixture(entry: Pick<WorkspaceEntry, 'id'> & Partial<WorkspaceEntry
         description: '',
         childIds: [],
         assignees: [],
+        labelIds: [],
         type: 'group',
+        ...(entry.type === 'goal' ? { goalCategory: 'Delivery' as const } : {}),
         ...entry
     };
 }
@@ -500,7 +674,8 @@ test('given a selected parent, deleting it preserves its child and clears the se
             description: '',
             childIds: [],
             type: 'group',
-            assignees: []
+            assignees: [],
+            labelIds: []
         }
     ]);
 });
@@ -607,7 +782,8 @@ test('given a goal, creating an assigned metric saves its values and parent conn
         currentValue: 8,
         targetValue: 2,
         unit: 'hours',
-        assignees: [{ accountId: 'preview-alex', displayName: 'Alex Morgan' }]
+        assignees: [{ accountId: 'preview-alex', displayName: 'Alex Morgan' }],
+        labelIds: []
     });
     expect(required(saved.items.find((entry) => entry.id === 'goal')).childIds).toEqual([
         'created-entry'
