@@ -11,6 +11,7 @@ import * as jiraUsers from '../../../services/jiraUsers';
 import type { SavedGraph, WorkspaceEntry } from '../../../types/workspace';
 import {
     buildListRows,
+    connectedEntries,
     linkListEntry,
     matchesAssignees,
     moveGoalToGroup,
@@ -1615,6 +1616,100 @@ test('given a goal, creating an assigned metric saves its values and parent conn
     expect(required(saved.items.find((entry) => entry.id === 'goal')).childIds).toEqual([
         'created-entry'
     ]);
+});
+
+test('given shared goals, tree focus follows every indirect connection but ignores group membership', () => {
+    const items = [
+        entryFixture({ id: 'group', childIds: ['first', 'unrelated'] }),
+        entryFixture({ id: 'first', type: 'goal', childIds: ['shared', 'sibling'] }),
+        entryFixture({ id: 'second', type: 'goal', childIds: ['shared'] }),
+        entryFixture({ id: 'shared', type: 'goal', childIds: ['metric'] }),
+        entryFixture({ id: 'metric', type: 'metric' }),
+        entryFixture({ id: 'sibling', type: 'goal' }),
+        entryFixture({ id: 'unrelated', type: 'goal' })
+    ];
+    expect(connectedEntries(items, 'metric').map((entry) => entry.id)).toEqual([
+        'first',
+        'second',
+        'shared',
+        'metric',
+        'sibling'
+    ]);
+    expect(connectedEntries(items, 'unrelated').map((entry) => entry.id)).toEqual(['unrelated']);
+    expect(connectedEntries(items, 'missing')).toEqual(items);
+    expect(connectedEntries(items, 'group')).toEqual(items);
+});
+
+test('given a clicked tree node, unrelated nodes hide and clearing focus restores the full tree', async () => {
+    const items = [
+        entryFixture({ id: 'group', childIds: ['parent', 'other'] }),
+        entryFixture({ id: 'parent', type: 'goal', name: 'Parent', childIds: ['child'] }),
+        entryFixture({ id: 'child', type: 'goal', name: 'Child', childIds: ['metric'] }),
+        entryFixture({ id: 'metric', type: 'metric' }),
+        entryFixture({ id: 'other', type: 'goal', name: 'Other' })
+    ];
+    localStorage.setItem(
+        'compass-preview-v1',
+        JSON.stringify({ items, labels: [], updatedAt: null })
+    );
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    const viewButton = (name: string) =>
+        required(
+            [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].find(
+                (button) => button.textContent?.trim() === name
+            )
+        );
+    const latestData = () => mockNetwork.mock.calls[mockNetwork.mock.calls.length - 1][1];
+    const graphEvent = (name: string, nodes: string[]) => {
+        const instance: NetworkMock =
+            mockNetwork.mock.results[mockNetwork.mock.results.length - 1].value;
+        required(instance.on.mock.calls.find(([eventName]) => eventName === name))[1]({ nodes });
+    };
+    act(() => Simulate.click(viewButton('Tree')));
+    expect(latestData().nodes.map((node) => node.id)).toEqual([
+        'parent',
+        'child',
+        'metric',
+        'other'
+    ]);
+    act(() => graphEvent('selectNode', ['child']));
+    expect(latestData().nodes.map((node) => node.id)).toEqual(['parent', 'child', 'metric']);
+    expect(latestData().edges).toEqual([
+        { from: 'parent', to: 'child' },
+        { from: 'child', to: 'metric' }
+    ]);
+    expect(container.querySelector('.connection-count')?.textContent).toBe(
+        '3 items · 2 relationships'
+    );
+    expect(container.querySelector('#item-name')).not.toBeNull();
+    act(() => Simulate.click(viewButton('Graph')));
+    expect(latestData().nodes.map((node) => node.id)).toEqual([
+        'parent',
+        'child',
+        'metric',
+        'other'
+    ]);
+    act(() => Simulate.click(viewButton('Tree')));
+    expect(latestData().nodes.map((node) => node.id)).toEqual(['parent', 'child', 'metric']);
+    act(() => Simulate.click(required(container.querySelector('[aria-label="Show full tree"]'))));
+    expect(latestData().nodes.map((node) => node.id)).toEqual([
+        'parent',
+        'child',
+        'metric',
+        'other'
+    ]);
+    act(() => graphEvent('selectNode', ['other']));
+    expect(latestData().nodes.map((node) => node.id)).toEqual(['other']);
+    act(() => graphEvent('click', []));
+    expect(latestData().nodes.map((node) => node.id)).toEqual([
+        'parent',
+        'child',
+        'metric',
+        'other'
+    ]);
+    expect(savedGraph().items).toEqual(items);
 });
 
 test('given groups and shared goals, the tree uses category styling and preserves every relationship', () => {

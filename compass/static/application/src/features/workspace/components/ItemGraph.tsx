@@ -14,10 +14,11 @@ interface ItemGraphProps {
     selectedId: string | null;
     mode: ViewMode;
     onSelect: (id: string) => void;
+    onClearSelection?: () => void;
 }
 
 const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
-    { items, labels, selectedId, mode, onSelect },
+    { items, labels, selectedId, mode, onSelect, onClearSelection },
     ref
 ) {
     const container = useRef<HTMLDivElement>(null);
@@ -154,12 +155,15 @@ const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
         instance.on('selectNode', ({ nodes }: { nodes: Array<string | number> }) => {
             if (nodes.length) onSelect(String(nodes[0]));
         });
+        instance.on('click', ({ nodes }: { nodes: Array<string | number> }) => {
+            if (mode === 'tree' && !nodes.length) onClearSelection?.();
+        });
         instance.once('stabilizationIterationsDone', () => instance.fit());
         return () => {
             network.current = null;
             instance.destroy();
         };
-    }, [items, labels, mode, onSelect]);
+    }, [items, labels, mode, onSelect, onClearSelection]);
 
     useEffect(() => {
         const selectionExists = items.some(

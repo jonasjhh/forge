@@ -29,6 +29,7 @@ import LabelManager from '../features/workspace/components/LabelManager';
 import WorkspaceTransfer from '../features/workspace/components/WorkspaceTransfer';
 import {
     entryTypes,
+    connectedEntries,
     goalCategories,
     includeAncestors,
     linkListEntry,
@@ -161,7 +162,11 @@ function App() {
             searchableText.includes(normalizedSearch)
         );
     });
-    const graphItems = includeAncestors(items, visibleItems);
+    const contextualItems = includeAncestors(items, visibleItems);
+    const graphItems =
+        mode === 'tree' && selectedId
+            ? connectedEntries(contextualItems, selectedId)
+            : contextualItems;
     const relationshipItems = graphItems.filter((item) => item.type !== 'group');
     const filtered =
         assigneeFilter.length > 0 ||
@@ -410,6 +415,14 @@ function App() {
                             </button>
                         </div>
                         <div className="view-toolbar-actions">
+                            {mode === 'tree' && selected && selected.type !== 'group' && (
+                                <IconButton
+                                    label="Show full tree"
+                                    onClick={() => setSelectedId(null)}
+                                >
+                                    <ListTree size={16} />
+                                </IconButton>
+                            )}
                             <span className="connection-count">
                                 {mode === 'list'
                                     ? listCountLabel
@@ -506,6 +519,7 @@ function App() {
                                         selectedId={selectedId}
                                         mode={mode}
                                         onSelect={setSelectedId}
+                                        onClearSelection={() => setSelectedId(null)}
                                     />
                                 ) : (
                                     <div className="empty-state">

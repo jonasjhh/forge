@@ -170,6 +170,33 @@ export function includeAncestors(
     return items.filter((item) => included.has(item.id));
 }
 
+export function connectedEntries(items: WorkspaceEntry[], selectedId: string): WorkspaceEntry[] {
+    const neighbors = new Map(
+        items
+            .filter((entry) => entry.type !== 'group')
+            .map((entry) => [entry.id, new Set<string>()])
+    );
+    if (!neighbors.has(selectedId)) return items;
+    items.forEach((entry) => {
+        if (!neighbors.has(entry.id)) return;
+        entry.childIds.forEach((childId) => {
+            if (!neighbors.has(childId)) return;
+            neighbors.get(entry.id)!.add(childId);
+            neighbors.get(childId)!.add(entry.id);
+        });
+    });
+    const connected = new Set([selectedId]);
+    const pending = [selectedId];
+    while (pending.length) {
+        neighbors.get(pending.pop()!)!.forEach((neighborId) => {
+            if (connected.has(neighborId)) return;
+            connected.add(neighborId);
+            pending.push(neighborId);
+        });
+    }
+    return items.filter((entry) => connected.has(entry.id));
+}
+
 export function moveListEntry(
     items: WorkspaceEntry[],
     sourcePath: string,
