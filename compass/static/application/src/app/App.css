@@ -329,22 +329,14 @@
     font-size: 11px;
     max-width: 100%;
 }
-.table-parent-links {
-    display: grid;
-    gap: 5px;
+.parent-goal-count {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    cursor: help;
 }
-.table-parent-links button {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: #0055cc;
-    text-align: left;
-    font-size: 12px;
-    line-height: 1.5;
-    overflow-wrap: anywhere;
-}
-.table-parent-links button:hover {
-    text-decoration: underline;
+.parent-goal-count:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
 }
 .metric-count {
     margin: 0;

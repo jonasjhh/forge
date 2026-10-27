@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { act, Simulate } from 'react-dom/test-utils';
-import { Network } from 'vis-network/standalone';
+import { DataSet, Network } from 'vis-network/standalone';
 import App from '../../../app/App';
 import ItemGraph from '../components/ItemGraph';
 import GoalList from '../components/GoalList';
@@ -78,6 +78,37 @@ test('given the type dropdown, goal categories filter separately and retain matc
     setChecked('all', true);
     expect(container.querySelector('[data-entry-id="empty-group"]')).not.toBeNull();
     expect(required(container.querySelector('.connection-count')).textContent).toBe('4 entries');
+});
+
+test('given the New goal dialog, fields follow the requested order and parent selection remains available', async () => {
+    localStorage.setItem(
+        'compass-preview-v1',
+        JSON.stringify({
+            items: [entryFixture({ id: 'group', name: 'Group' })],
+            labels: [{ id: 'team', name: 'Team', color: '#0c66e4' }],
+            updatedAt: null
+        })
+    );
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    act(() =>
+        Simulate.click(required(container.querySelector('[aria-label="Add goal under Group"]')))
+    );
+    const dialog = required(container.querySelector('dialog'));
+    const fields = dialog.querySelectorAll(
+        '#new-type, #new-goal-category, #new-name, #new-description, #new-assignees, summary[aria-label="Labels"], #new-parent'
+    );
+    expect([...fields].map((field) => field.id || field.getAttribute('aria-label'))).toEqual([
+        'new-type',
+        'new-goal-category',
+        'new-name',
+        'new-description',
+        'new-assignees',
+        'Labels',
+        'new-parent'
+    ]);
+    expect(required(dialog.querySelector<HTMLSelectElement>('#new-parent')).value).toBe('group');
 });
 
 test('given a goal category, creating and changing it updates the list label and icon', async () => {
@@ -961,8 +992,8 @@ test.each([
     },
     { selector: '[data-path="parent"] .link-drop-target svg', selected: [], deleted: [] },
     {
-        selector: '[data-path="parent/child"] .table-parent-links button',
-        selected: ['parent'],
+        selector: '[data-path="parent/child"] .parent-goal-count',
+        selected: ['child'],
         deleted: []
     }
 ])(
@@ -1109,6 +1140,58 @@ test.each([
     }
 );
 
+test.each([0, 1, 12])(
+    'given %s parent goals, the list shows a compact count with names in its tooltip',
+    (parentCount) => {
+        const parents = Array.from({ length: parentCount }, (_, index) =>
+            entryFixture({
+                id: `parent-${index}`,
+                type: 'goal',
+                name: `Parent ${index + 1}`,
+                childIds: ['shared']
+            })
+        );
+        const items = [
+            entryFixture({ id: 'group', name: 'Group', childIds: ['shared'] }),
+            ...parents,
+            entryFixture({ id: 'shared', type: 'goal', name: 'Shared' })
+        ];
+        act(() => {
+            ReactDOM.render(
+                <GoalList
+                    items={items}
+                    labels={[]}
+                    entries={items}
+                    selectedId={null}
+                    busy={false}
+                    onSelect={() => {}}
+                    onDelete={() => {}}
+                    onCreateGoal={() => {}}
+                    onLink={async () => true}
+                    onRearrange={async () => true}
+                />,
+                container
+            );
+        });
+        const cell = required(
+            container.querySelector('[data-path="group/shared"] .column-parents')
+        );
+        const count = required(cell.querySelector<HTMLElement>('.parent-goal-count'));
+        expect(cell.textContent?.trim()).toBe(String(parentCount));
+        expect(count.title).toBe(
+            parentCount ? parents.map((parent) => parent.name).join('\n') : 'No parent goals'
+        );
+        expect(count.getAttribute('aria-label')).toContain(
+            `${parentCount} ${parentCount === 1 ? 'parent goal' : 'parent goals'}`
+        );
+        expect(count.tabIndex).toBe(0);
+        expect(container.querySelector('[data-path="group"] .column-parents')?.textContent).toBe(
+            '-'
+        );
+        expect(cell.querySelector('button')).toBeNull();
+    }
+);
+
 test('given a table column resizer, arrow keys adjust the adjacent column widths', () => {
     const items = [entryFixture({ id: 'group', type: 'group' })];
     act(() => {
@@ -1237,6 +1320,7 @@ test('given Jira avatar metadata, only approved HTTPS image hosts are used', () 
 });
 
 jest.mock('vis-network/standalone', () => ({
+    ...jest.requireActual('vis-network/standalone/umd/vis-network.js'),
     Network: jest.fn()
 }));
 
@@ -1246,16 +1330,52 @@ interface GraphMockData {
         label: string;
         title: string;
         color: { background: string; border: string };
+        hidden?: boolean;
     }>;
-    edges: Array<{ from: string; to: string }>;
+    edges: Array<{ id?: string; from: string; to: string; hidden?: boolean }>;
 }
 interface NetworkMock {
     on: jest.Mock;
     once: jest.Mock;
     destroy: jest.Mock;
     selectNodes: jest.Mock;
+    stopSimulation: jest.Mock;
+    setOptions: jest.Mock;
+    fit: jest.Mock;
 }
-const mockNetwork = Network as unknown as jest.Mock<NetworkMock, [HTMLElement, GraphMockData]>;
+const mockNetwork = Network as unknown as jest.Mock<
+    NetworkMock,
+    [
+        HTMLElement,
+        {
+            nodes: DataSet<GraphMockData['nodes'][number]>;
+            edges: DataSet<GraphMockData['edges'][number]>;
+        },
+        {
+            edges: { arrows: { from: { enabled: boolean }; to: { enabled: boolean } } };
+            nodes: {
+                font: {
+                    size: number;
+                    align: string;
+                    multi: string;
+                    bold: { size: number; mod: string };
+                };
+                chosen: { label: boolean };
+            };
+        }?
+    ]
+>;
+
+function graphSnapshot(index = mockNetwork.mock.calls.length - 1): GraphMockData {
+    const data = mockNetwork.mock.calls[index][1];
+    return {
+        nodes: data.nodes.get().filter((node) => !node.hidden),
+        edges: data.edges
+            .get()
+            .filter((edge) => !edge.hidden)
+            .map(({ from, to }) => ({ from, to }))
+    };
+}
 
 function required<Value>(value: Value | null | undefined): Value {
     if (value === null || value === undefined)
@@ -1334,12 +1454,15 @@ beforeEach(() => {
         value: { randomUUID: jest.fn(() => 'created-entry') }
     });
     mockNetwork.mockImplementation(
-        (element: HTMLElement, data: { nodes: Array<{ id: string }> }) => ({
+        (element: HTMLElement, data: { nodes: DataSet<{ id: string }> }) => ({
             on: jest.fn(),
             once: jest.fn(),
             destroy: jest.fn(),
+            stopSimulation: jest.fn(),
+            setOptions: jest.fn(),
+            fit: jest.fn(),
             selectNodes: jest.fn((selectedIds: string[]) => {
-                if (selectedIds.some((id) => !data.nodes.some((node) => node.id === id))) {
+                if (selectedIds.some((id) => !data.nodes.get(id))) {
                     throw new Error('Selected node is missing from the graph.');
                 }
             })
@@ -1640,12 +1763,124 @@ test('given shared goals, tree focus follows every indirect connection but ignor
     expect(connectedEntries(items, 'group')).toEqual(items);
 });
 
-test('given a clicked tree node, unrelated nodes hide and clearing focus restores the full tree', async () => {
+test.each(['Tree', 'Graph'])(
+    'given a clicked %s node, focus updates visibility without rebuilding the network',
+    async (view) => {
+        const items = [
+            entryFixture({ id: 'group', childIds: ['parent', 'other'] }),
+            entryFixture({ id: 'parent', type: 'goal', name: 'Parent', childIds: ['child'] }),
+            entryFixture({ id: 'child', type: 'goal', name: 'Child', childIds: ['metric'] }),
+            entryFixture({ id: 'metric', type: 'metric' }),
+            entryFixture({ id: 'other', type: 'goal', name: 'Other' })
+        ];
+        localStorage.setItem(
+            'compass-preview-v1',
+            JSON.stringify({ items, labels: [], updatedAt: null })
+        );
+        await act(async () => {
+            ReactDOM.render(<App />, container);
+        });
+        const viewButton = (name: string) =>
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].find(
+                    (button) => button.textContent?.trim() === name
+                )
+            );
+        const latestData = () => graphSnapshot();
+        const graphEvent = (name: string, nodes: string[]) => {
+            const instance: NetworkMock =
+                mockNetwork.mock.results[mockNetwork.mock.results.length - 1].value;
+            required(instance.on.mock.calls.find(([eventName]) => eventName === name))[1]({
+                nodes
+            });
+        };
+        act(() => Simulate.click(viewButton(view)));
+        const networkCount = mockNetwork.mock.calls.length;
+        const instance: NetworkMock = mockNetwork.mock.results[networkCount - 1].value;
+        expect(latestData().nodes.map((node) => node.id)).toEqual([
+            'parent',
+            'child',
+            'metric',
+            'other'
+        ]);
+        act(() => graphEvent('selectNode', ['child']));
+        expect(mockNetwork).toHaveBeenCalledTimes(networkCount);
+        expect(instance.destroy).not.toHaveBeenCalled();
+        expect(instance.stopSimulation).toHaveBeenCalled();
+        expect(latestData().nodes.map((node) => node.id)).toEqual(['parent', 'child', 'metric']);
+        expect(latestData().edges).toEqual([
+            { from: 'parent', to: 'child' },
+            { from: 'child', to: 'metric' }
+        ]);
+        expect(container.querySelector('.connection-count')?.textContent).toBe(
+            '3 items · 2 relationships'
+        );
+        expect(container.querySelector('#item-name')).not.toBeNull();
+        act(() => graphEvent('selectNode', ['metric']));
+        expect(mockNetwork).toHaveBeenCalledTimes(networkCount);
+        expect(latestData().nodes.map((node) => node.id)).toEqual(['parent', 'child', 'metric']);
+        act(() =>
+            Simulate.click(
+                required(container.querySelector(`[aria-label="Show full ${view.toLowerCase()}"]`))
+            )
+        );
+        expect(latestData().nodes.map((node) => node.id)).toEqual([
+            'parent',
+            'child',
+            'metric',
+            'other'
+        ]);
+        act(() => graphEvent('selectNode', ['other']));
+        expect(latestData().nodes.map((node) => node.id)).toEqual(['other']);
+        act(() => graphEvent('click', []));
+        expect(latestData().nodes.map((node) => node.id)).toEqual([
+            'parent',
+            'child',
+            'metric',
+            'other'
+        ]);
+        expect(savedGraph().items).toEqual(items);
+        expect(mockNetwork).toHaveBeenCalledTimes(networkCount);
+        act(() => graphEvent('selectNode', ['child']));
+        expect(latestData().nodes.map((node) => node.id)).toEqual(['parent', 'child', 'metric']);
+        const refreshedItems = items.map((item) =>
+            item.id === 'other' ? { ...item, name: 'Updated elsewhere' } : item
+        );
+        localStorage.setItem(
+            'compass-preview-v1',
+            JSON.stringify({
+                items: refreshedItems,
+                labels: [],
+                updatedAt: null
+            })
+        );
+        await act(async () => {
+            Simulate.click(required(container.querySelector('[aria-label="Refresh workspace"]')));
+        });
+        expect(latestData().nodes.map((node) => node.id)).toEqual([
+            'parent',
+            'child',
+            'metric',
+            'other'
+        ]);
+        expect(required(latestData().nodes.find((node) => node.id === 'other')).label).toContain(
+            'Updated elsewhere'
+        );
+        expect(container.querySelector('.details')).toBeNull();
+        expect(
+            container.querySelector(`[aria-label="Show full ${view.toLowerCase()}"]`)
+        ).toBeNull();
+        expect(container.querySelector('.connection-count')?.textContent).toBe(
+            '4 items · 2 relationships'
+        );
+    }
+);
+
+test('given a selected list row, only its connected items remain and graph inherits the focus', async () => {
     const items = [
-        entryFixture({ id: 'group', childIds: ['parent', 'other'] }),
+        entryFixture({ id: 'group', name: 'Group', childIds: ['parent', 'other'] }),
         entryFixture({ id: 'parent', type: 'goal', name: 'Parent', childIds: ['child'] }),
-        entryFixture({ id: 'child', type: 'goal', name: 'Child', childIds: ['metric'] }),
-        entryFixture({ id: 'metric', type: 'metric' }),
+        entryFixture({ id: 'child', type: 'goal', name: 'Child' }),
         entryFixture({ id: 'other', type: 'goal', name: 'Other' })
     ];
     localStorage.setItem(
@@ -1655,62 +1890,160 @@ test('given a clicked tree node, unrelated nodes hide and clearing focus restore
     await act(async () => {
         ReactDOM.render(<App />, container);
     });
-    const viewButton = (name: string) =>
-        required(
-            [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].find(
-                (button) => button.textContent?.trim() === name
+    act(() => Simulate.click(required(container.querySelector('[aria-label="Open goal Child"]'))));
+    expect(
+        [...container.querySelectorAll<HTMLElement>('.entry-row')].map((row) => row.dataset.entryId)
+    ).toEqual(['group', 'parent', 'child']);
+    act(() =>
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].find(
+                    (button) => button.textContent?.trim() === 'Graph'
+                )
             )
-        );
-    const latestData = () => mockNetwork.mock.calls[mockNetwork.mock.calls.length - 1][1];
-    const graphEvent = (name: string, nodes: string[]) => {
-        const instance: NetworkMock =
-            mockNetwork.mock.results[mockNetwork.mock.results.length - 1].value;
-        required(instance.on.mock.calls.find(([eventName]) => eventName === name))[1]({ nodes });
-    };
-    act(() => Simulate.click(viewButton('Tree')));
-    expect(latestData().nodes.map((node) => node.id)).toEqual([
-        'parent',
-        'child',
-        'metric',
-        'other'
-    ]);
-    act(() => graphEvent('selectNode', ['child']));
-    expect(latestData().nodes.map((node) => node.id)).toEqual(['parent', 'child', 'metric']);
-    expect(latestData().edges).toEqual([
-        { from: 'parent', to: 'child' },
-        { from: 'child', to: 'metric' }
-    ]);
-    expect(container.querySelector('.connection-count')?.textContent).toBe(
-        '3 items · 2 relationships'
+        )
     );
-    expect(container.querySelector('#item-name')).not.toBeNull();
-    act(() => Simulate.click(viewButton('Graph')));
-    expect(latestData().nodes.map((node) => node.id)).toEqual([
-        'parent',
-        'child',
-        'metric',
-        'other'
-    ]);
-    act(() => Simulate.click(viewButton('Tree')));
-    expect(latestData().nodes.map((node) => node.id)).toEqual(['parent', 'child', 'metric']);
-    act(() => Simulate.click(required(container.querySelector('[aria-label="Show full tree"]'))));
-    expect(latestData().nodes.map((node) => node.id)).toEqual([
-        'parent',
-        'child',
-        'metric',
-        'other'
-    ]);
-    act(() => graphEvent('selectNode', ['other']));
-    expect(latestData().nodes.map((node) => node.id)).toEqual(['other']);
-    act(() => graphEvent('click', []));
-    expect(latestData().nodes.map((node) => node.id)).toEqual([
-        'parent',
-        'child',
-        'metric',
-        'other'
-    ]);
+    expect(graphSnapshot().nodes.map((node) => node.id)).toEqual(['parent', 'child']);
+    act(() =>
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].find(
+                    (button) => button.textContent?.trim() === 'List'
+                )
+            )
+        )
+    );
+    act(() => Simulate.click(required(container.querySelector('[aria-label="Show full list"]'))));
+    expect(container.querySelector('[data-entry-id="other"]')).not.toBeNull();
     expect(savedGraph().items).toEqual(items);
 });
+
+test('given changed callbacks and selection, the graph keeps its network and invokes the current callback', () => {
+    const items = [entryFixture({ id: 'goal', type: 'goal' })];
+    const originalSelect = jest.fn();
+    const currentSelect = jest.fn();
+    act(() => {
+        ReactDOM.render(
+            <ItemGraph
+                items={items}
+                labels={[]}
+                selectedId={null}
+                mode="graph"
+                onSelect={originalSelect}
+            />,
+            container
+        );
+    });
+    const instance: NetworkMock = mockNetwork.mock.results[0].value;
+    act(() => {
+        ReactDOM.render(
+            <ItemGraph
+                items={[...items]}
+                labels={[]}
+                selectedId="goal"
+                mode="graph"
+                onSelect={currentSelect}
+            />,
+            container
+        );
+    });
+    act(() =>
+        required(instance.on.mock.calls.find(([eventName]) => eventName === 'selectNode'))[1]({
+            nodes: ['goal']
+        })
+    );
+    expect(mockNetwork).toHaveBeenCalledTimes(1);
+    expect(instance.destroy).not.toHaveBeenCalled();
+    expect(currentSelect).toHaveBeenCalledWith('goal');
+    expect(originalSelect).not.toHaveBeenCalled();
+});
+
+test('given title text containing markup, the graph keeps it literal rather than formatting the title', () => {
+    const items = [
+        entryFixture({ id: 'goal', type: 'goal', name: 'A <b>literal</b> & *plain* title' })
+    ];
+    act(() => {
+        ReactDOM.render(
+            <ItemGraph
+                items={items}
+                labels={[]}
+                selectedId={null}
+                mode="graph"
+                onSelect={() => {}}
+            />,
+            container
+        );
+    });
+    expect(graphSnapshot().nodes[0].label).toBe(
+        '<b>Delivery</b>\nA <\u200bb>literal<\u200b/b> & *plain* title'
+    );
+});
+
+test('given updated entries, the existing graph updates labels and connections without rebuilding', () => {
+    const initial = [
+        entryFixture({ id: 'parent', type: 'goal', childIds: ['old'] }),
+        entryFixture({ id: 'old', type: 'goal' })
+    ];
+    const updated = [
+        { ...initial[0], name: 'Updated parent', childIds: ['new'] },
+        entryFixture({ id: 'new', type: 'metric' })
+    ];
+    act(() => {
+        ReactDOM.render(
+            <ItemGraph
+                items={initial}
+                labels={[]}
+                selectedId={null}
+                mode="graph"
+                onSelect={() => {}}
+            />,
+            container
+        );
+    });
+    act(() => {
+        ReactDOM.render(
+            <ItemGraph
+                items={updated}
+                labels={[]}
+                selectedId="parent"
+                mode="graph"
+                onSelect={() => {}}
+            />,
+            container
+        );
+    });
+    expect(mockNetwork).toHaveBeenCalledTimes(1);
+    expect(graphSnapshot().nodes.map((node) => node.id)).toEqual(['parent', 'new']);
+    expect(graphSnapshot().nodes[0].label).toBe('<b>Delivery</b>\nUpdated parent');
+    expect(graphSnapshot().edges).toEqual([{ from: 'parent', to: 'new' }]);
+});
+
+test.each(['graph', 'tree'] as const)(
+    'given %s view, arrowheads point in the intended direction without changing connections',
+    (mode) => {
+        const items = [
+            entryFixture({ id: 'parent', type: 'goal', childIds: ['child'] }),
+            entryFixture({ id: 'child', type: 'goal' })
+        ];
+        act(() => {
+            ReactDOM.render(
+                <ItemGraph
+                    items={items}
+                    labels={[]}
+                    selectedId={null}
+                    mode={mode}
+                    onSelect={() => {}}
+                />,
+                container
+            );
+        });
+        const [containerElement, , options] = mockNetwork.mock.calls[0];
+        expect(containerElement).toBe(container.querySelector('.network-canvas'));
+        expect(graphSnapshot().edges).toEqual([{ from: 'parent', to: 'child' }]);
+        expect(required(options).edges.arrows.from.enabled).toBe(true);
+        expect(required(options).edges.arrows.to.enabled).toBe(false);
+    }
+);
 
 test('given groups and shared goals, the tree uses category styling and preserves every relationship', () => {
     const items = [
@@ -1767,16 +2100,22 @@ test('given groups and shared goals, the tree uses category styling and preserve
             container
         );
     });
-    const data: GraphMockData = mockNetwork.mock.calls[0][1];
+    const data: GraphMockData = graphSnapshot(0);
+    const typography = required(mockNetwork.mock.calls[0][2]).nodes;
+    expect(typography.font.align).toBe('left');
+    expect(typography.font.multi).toBe('html');
+    expect(typography.font.bold.size).toBeLessThan(typography.font.size);
+    expect(typography.font.bold.mod).toBe('');
+    expect(typography.chosen.label).toBe(false);
     expect(data.nodes.map((node) => node.id)).toEqual(['first', 'second', 'shared', 'metric']);
-    expect(data.nodes[0].label).toBe('Decision\nFirst');
+    expect(data.nodes[0].label).toBe('<b>Decision</b>\nFirst');
     expect(data.nodes[0].color).toEqual({ background: '#fff1ef', border: '#ae2a19' });
-    expect(data.nodes[1].label).toBe('Capability\nSecond');
-    expect(data.nodes[2].label).toBe('Delivery · Sub-goal\nShared\n# Platform');
+    expect(data.nodes[1].label).toBe('<b>Capability</b>\nSecond');
+    expect(data.nodes[2].label).toBe('<b>Delivery · Sub-goal</b>\nShared\n<code># Platform</code>');
     expect(data.nodes[2].title).toContain('Assignees: Alice');
     expect(data.nodes[2].title).toContain('Labels: Platform');
     expect(data.nodes[2].title).toContain('Shared description');
-    expect(data.nodes[3].label).toBe('Metric\nMetric\n8 / 10 days');
+    expect(data.nodes[3].label).toBe('<b>Metric</b>\nMetric\n<code>8 / 10 days</code>');
     expect(data.edges).toEqual([
         { from: 'first', to: 'shared' },
         { from: 'second', to: 'shared' },

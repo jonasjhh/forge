@@ -413,23 +413,24 @@ export default function GoalList({
                                                 </div>
                                             </td>
                                             <td className="column-parents">
-                                                <div className="table-parent-links">
-                                                    {parents.length ? (
-                                                        parents.map((parent) => (
-                                                            <button
-                                                                type="button"
-                                                                key={parent.id}
-                                                                onClick={() => onSelect(parent.id)}
-                                                            >
-                                                                {parent.name}
-                                                            </button>
-                                                        ))
-                                                    ) : (
-                                                        <span className="muted">
-                                                            {entry.type === 'group' ? '-' : 'None'}
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                {entry.type === 'group' ? (
+                                                    <span className="muted">-</span>
+                                                ) : (
+                                                    <span
+                                                        className="count parent-goal-count"
+                                                        tabIndex={0}
+                                                        title={
+                                                            parents.length
+                                                                ? parents
+                                                                      .map((parent) => parent.name)
+                                                                      .join('\n')
+                                                                : 'No parent goals'
+                                                        }
+                                                        aria-label={`${parents.length} ${parents.length === 1 ? 'parent goal' : 'parent goals'}${parents.length ? `: ${parents.map((parent) => parent.name).join(', ')}` : ''}`}
+                                                    >
+                                                        {parents.length}
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="column-metrics">
                                                 {entry.type === 'goal' ? (

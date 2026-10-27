@@ -138,7 +138,7 @@ function App() {
 
     const selected = items.find((item) => item.id === selectedId);
     const normalizedSearch = search.trim().toLowerCase();
-    const visibleItems = items.filter((item) => {
+    const matchingItems = items.filter((item) => {
         const assignedLabels = (item.labelIds ?? [])
             .map((id) => labels.find((label) => label.id === id)?.name)
             .filter(Boolean)
@@ -162,11 +162,10 @@ function App() {
             searchableText.includes(normalizedSearch)
         );
     });
-    const contextualItems = includeAncestors(items, visibleItems);
-    const graphItems =
-        mode === 'tree' && selectedId
-            ? connectedEntries(contextualItems, selectedId)
-            : contextualItems;
+    const contextualItems = includeAncestors(items, matchingItems);
+    const graphItems = selectedId ? connectedEntries(contextualItems, selectedId) : contextualItems;
+    const focusedIds = new Set(graphItems.map((item) => item.id));
+    const visibleItems = matchingItems.filter((item) => focusedIds.has(item.id));
     const relationshipItems = graphItems.filter((item) => item.type !== 'group');
     const filtered =
         assigneeFilter.length > 0 ||
@@ -415,9 +414,9 @@ function App() {
                             </button>
                         </div>
                         <div className="view-toolbar-actions">
-                            {mode === 'tree' && selected && selected.type !== 'group' && (
+                            {mode !== 'labels' && selected && selected.type !== 'group' && (
                                 <IconButton
-                                    label="Show full tree"
+                                    label={`Show full ${mode === 'list' ? 'list' : mode}`}
                                     onClick={() => setSelectedId(null)}
                                 >
                                     <ListTree size={16} />
@@ -433,7 +432,10 @@ function App() {
                             <IconButton
                                 label="Refresh workspace"
                                 disabled={loading || busy}
-                                onClick={() => setReload((value) => value + 1)}
+                                onClick={() => {
+                                    if (mode === 'graph' || mode === 'tree') setSelectedId(null);
+                                    setReload((value) => value + 1);
+                                }}
                             >
                                 <RefreshCw size={16} className={loading ? 'spin' : ''} />
                             </IconButton>
@@ -514,7 +516,8 @@ function App() {
                                 ) : relationshipItems.length ? (
                                     <ItemGraph
                                         ref={graph}
-                                        items={graphItems}
+                                        items={contextualItems}
+                                        visibleIds={graphItems.map((item) => item.id)}
                                         labels={labels}
                                         selectedId={selectedId}
                                         mode={mode}

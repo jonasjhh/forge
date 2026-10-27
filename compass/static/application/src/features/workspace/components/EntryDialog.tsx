@@ -146,6 +146,68 @@ export default function EntryDialog({
                                 </option>
                             ))}
                         </select>
+                        {type === 'goal' && (
+                            <React.Fragment>
+                                <label htmlFor="new-goal-category">Goal type</label>
+                                <select
+                                    id="new-goal-category"
+                                    value={goalCategory}
+                                    disabled={busy}
+                                    onChange={(event) =>
+                                        setGoalCategory(event.target.value as GoalCategory)
+                                    }
+                                >
+                                    {goalCategories.map((category) => (
+                                        <option key={category} value={category}>
+                                            {category}
+                                        </option>
+                                    ))}
+                                </select>
+                            </React.Fragment>
+                        )}
+                        <label htmlFor="new-name">Name</label>
+                        <input
+                            id="new-name"
+                            autoFocus
+                            required
+                            maxLength={200}
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            disabled={busy}
+                        />
+                        <label htmlFor="new-description">
+                            Description <span className="optional">optional</span>
+                        </label>
+                        <textarea
+                            id="new-description"
+                            rows={3}
+                            maxLength={500}
+                            value={description}
+                            onChange={(event) => setDescription(event.target.value)}
+                            disabled={busy}
+                        />
+                        {type === 'metric' && (
+                            <MetricFields
+                                value={metric}
+                                onChange={setMetric}
+                                disabled={busy}
+                                prefix="new-metric"
+                            />
+                        )}
+                        {type !== 'group' && (
+                            <AssigneePicker
+                                value={assignees}
+                                onChange={setAssignees}
+                                disabled={busy}
+                                id="new-assignees"
+                            />
+                        )}
+                        <LabelPicker
+                            labels={labels}
+                            value={labelIds}
+                            onChange={setLabelIds}
+                            disabled={busy}
+                        />
                         <label htmlFor="new-parent">
                             {type === 'metric'
                                 ? 'Goal'
@@ -173,68 +235,6 @@ export default function EntryDialog({
                                 </option>
                             ))}
                         </select>
-                        <label htmlFor="new-name">Name</label>
-                        <input
-                            id="new-name"
-                            autoFocus
-                            required
-                            maxLength={200}
-                            value={name}
-                            onChange={(event) => setName(event.target.value)}
-                            disabled={busy}
-                        />
-                        <LabelPicker
-                            labels={labels}
-                            value={labelIds}
-                            onChange={setLabelIds}
-                            disabled={busy}
-                        />
-                        {type === 'goal' && (
-                            <React.Fragment>
-                                <label htmlFor="new-goal-category">Goal type</label>
-                                <select
-                                    id="new-goal-category"
-                                    value={goalCategory}
-                                    disabled={busy}
-                                    onChange={(event) =>
-                                        setGoalCategory(event.target.value as GoalCategory)
-                                    }
-                                >
-                                    {goalCategories.map((category) => (
-                                        <option key={category} value={category}>
-                                            {category}
-                                        </option>
-                                    ))}
-                                </select>
-                            </React.Fragment>
-                        )}
-                        {type === 'metric' && (
-                            <MetricFields
-                                value={metric}
-                                onChange={setMetric}
-                                disabled={busy}
-                                prefix="new-metric"
-                            />
-                        )}
-                        {type !== 'group' && (
-                            <AssigneePicker
-                                value={assignees}
-                                onChange={setAssignees}
-                                disabled={busy}
-                                id="new-assignees"
-                            />
-                        )}
-                        <label htmlFor="new-description">
-                            Description <span className="optional">optional</span>
-                        </label>
-                        <textarea
-                            id="new-description"
-                            rows={3}
-                            maxLength={500}
-                            value={description}
-                            onChange={(event) => setDescription(event.target.value)}
-                            disabled={busy}
-                        />
                     </React.Fragment>
                 )}
                 <div className="dialog-actions">
