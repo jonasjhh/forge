@@ -60,6 +60,22 @@ export function canConnect(
     return true;
 }
 
+export function linkListEntry(
+    items: WorkspaceEntry[],
+    sourceId: string,
+    parentId: string
+): WorkspaceEntry[] {
+    const child = items.find((entry) => entry.id === sourceId);
+    const parent = items.find((entry) => entry.id === parentId);
+    if (!child || !parent || !canConnect(items, parent, child))
+        throw new Error(
+            'This connection is incompatible, already exists, or would create a cycle.'
+        );
+    return items.map((entry) =>
+        entry.id === parentId ? { ...entry, childIds: [...entry.childIds, sourceId] } : entry
+    );
+}
+
 export function moveGoalToGroup(
     items: WorkspaceEntry[],
     goalId: string,

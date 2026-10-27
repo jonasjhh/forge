@@ -9,7 +9,13 @@ import AssigneeChip from '../../../components/assignees/AssigneeChip';
 import { getUserAvatar } from '../../../services/jiraUsers';
 import * as jiraUsers from '../../../services/jiraUsers';
 import type { SavedGraph, WorkspaceEntry } from '../../../types/workspace';
-import { buildListRows, matchesAssignees, moveGoalToGroup, moveListEntry } from '../model/entries';
+import {
+    buildListRows,
+    linkListEntry,
+    matchesAssignees,
+    moveGoalToGroup,
+    moveListEntry
+} from '../model/entries';
 
 test('given several selected assignees, entries matching any selected account are included', () => {
     const alice = { accountId: 'alice', displayName: 'Alice' };
@@ -200,6 +206,218 @@ test('given an edit sidebar, its divider resizes with pointer and keyboard withi
     expect(handle.getAttribute('aria-valuenow')).toBe('280');
     act(() => Simulate.keyDown(handle, { key: 'ArrowRight' }));
     expect(handle.getAttribute('aria-valuenow')).toBe('280');
+});
+
+test.each(['group', 'goal'] as const)(
+    'given a %s row, its plus shortcut creates a goal beneath that entry',
+    async (type) => {
+        localStorage.setItem(
+            'compass-preview-v1',
+            JSON.stringify({
+                items: [entryFixture({ id: 'parent', type, name: 'Parent' })],
+                updatedAt: null
+            })
+        );
+        await act(async () => {
+            ReactDOM.render(<App />, container);
+        });
+        act(() => {
+            required(container.querySelector('[aria-label="Add goal under Parent"]')).dispatchEvent(
+                new MouseEvent('click', { bubbles: true })
+            );
+        });
+        expect(container.querySelector('.details')).toBeNull();
+        expect(required(container.querySelector<HTMLSelectElement>('#new-type')).value).toBe(
+            'goal'
+        );
+        expect(required(container.querySelector<HTMLSelectElement>('#new-parent')).value).toBe(
+            'parent'
+        );
+        act(() => changeValue(required(container.querySelector('#new-name')), 'New child'));
+        await act(async () => {
+            Simulate.submit(required(container.querySelector('dialog form')));
+        });
+        expect(
+            required(savedGraph().items.find((entry) => entry.id === 'parent')).childIds
+        ).toEqual(['created-entry']);
+        expect(
+            required(savedGraph().items.find((entry) => entry.id === 'created-entry')).type
+        ).toBe('goal');
+        expect(container.querySelector('[data-path="parent/created-entry"]')).not.toBeNull();
+    }
+);
+
+test.each([
+    'invalid JSON',
+    '{"items": [], "labels": {}}',
+    JSON.stringify({
+        items: [
+            {
+                id: 'broken',
+                type: 'goal',
+                name: 'Broken',
+                description: '',
+                childIds: ['missing'],
+                assignees: [],
+                labelIds: []
+            }
+        ],
+        labels: []
+    })
+])('given invalid import data, existing workspace data is not changed', async (contents) => {
+    const original = {
+        items: [entryFixture({ id: 'old', name: 'Old' })],
+        labels: [],
+        updatedAt: null
+    };
+    localStorage.setItem('compass-preview-v1', JSON.stringify(original));
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    const write = jest.spyOn(Storage.prototype, 'setItem');
+    await selectImportFile(contents);
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(container.querySelector('dialog')).toBeNull();
+    expect(savedGraph()).toEqual(original);
+    expect(write).not.toHaveBeenCalled();
+});
+
+test('given a valid import, cancellation preserves data and confirmation replaces the entire workspace', async () => {
+    const original = {
+        items: [entryFixture({ id: 'old', name: 'Old' })],
+        labels: [],
+        updatedAt: null
+    };
+    const imported = {
+        items: [
+            entryFixture({ id: 'first', type: 'goal', name: 'First', childIds: ['shared'] }),
+            entryFixture({ id: 'second', type: 'goal', name: 'Second', childIds: ['shared'] }),
+            entryFixture({
+                id: 'shared',
+                type: 'goal',
+                name: 'Shared',
+                childIds: ['metric'],
+                labelIds: ['team'],
+                assignees: [{ accountId: 'alice', displayName: 'Alice' }]
+            }),
+            entryFixture({
+                id: 'metric',
+                type: 'metric',
+                name: 'Metric',
+                currentValue: 3,
+                targetValue: 10,
+                unit: 'days'
+            })
+        ],
+        labels: [{ id: 'team', name: 'Team', color: '#0c66e4' }]
+    };
+    localStorage.setItem('compass-preview-v1', JSON.stringify(original));
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    act(() => {
+        Simulate.click(required(container.querySelector('[aria-label="Open group Old"]')));
+        changeValue(required(container.querySelector('[aria-label="Search workspace"]')), 'Old');
+    });
+    const write = jest.spyOn(Storage.prototype, 'setItem');
+    await selectImportFile(JSON.stringify(imported));
+    expect(container.querySelector('#import-title')?.textContent).toBe('Replace workspace?');
+    expect(write).not.toHaveBeenCalled();
+    act(() =>
+        Simulate.click(required(container.querySelector('[aria-label="Close import dialog"]')))
+    );
+    expect(savedGraph()).toEqual(original);
+    await selectImportFile(JSON.stringify(imported));
+    await act(async () => {
+        Simulate.submit(required(container.querySelector('dialog form')));
+    });
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(savedGraph()).toEqual({ ...imported, updatedAt: expect.any(String) });
+    expect(container.querySelector('dialog')).toBeNull();
+    expect(container.querySelector('.details')).toBeNull();
+    expect(
+        required(container.querySelector<HTMLInputElement>('[aria-label="Search workspace"]')).value
+    ).toBe('');
+    expect(container.querySelectorAll('[data-entry-id="shared"]')).toHaveLength(2);
+    await act(async () => {
+        ReactDOM.unmountComponentAtNode(container);
+        ReactDOM.render(<App />, container);
+    });
+    expect(container.querySelectorAll('[data-entry-id="shared"]')).toHaveLength(2);
+    expect(container.querySelector('[data-entry-id="old"]')).toBeNull();
+});
+
+test('given a failed import save, the existing data remains and the confirmation can be retried', async () => {
+    const original = {
+        items: [entryFixture({ id: 'old', name: 'Old' })],
+        labels: [],
+        updatedAt: null
+    };
+    localStorage.setItem('compass-preview-v1', JSON.stringify(original));
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    await selectImportFile('{"items":[],"labels":[]}');
+    const write = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('Storage unavailable');
+    });
+    await act(async () => {
+        Simulate.submit(required(container.querySelector('dialog form')));
+    });
+    expect(savedGraph()).toEqual(original);
+    expect(container.querySelector('dialog [role="alert"]')).not.toBeNull();
+    write.mockRestore();
+    await act(async () => {
+        Simulate.submit(required(container.querySelector('dialog form')));
+    });
+    expect(savedGraph().items).toEqual([]);
+    expect(container.querySelector('dialog')).toBeNull();
+});
+
+test('given filtered workspace data, exporting downloads all entries and labels without writing', async () => {
+    const original = {
+        items: [
+            entryFixture({ id: 'visible', name: 'Visible' }),
+            entryFixture({ id: 'hidden', name: 'Hidden' })
+        ],
+        labels: [{ id: 'team', name: 'Team', color: '#0c66e4' }],
+        updatedAt: null
+    };
+    localStorage.setItem('compass-preview-v1', JSON.stringify(original));
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    act(() =>
+        changeValue(required(container.querySelector('[aria-label="Search workspace"]')), 'Visible')
+    );
+    const write = jest.spyOn(Storage.prototype, 'setItem');
+    const createUrl = jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:workspace');
+    let downloadName = '';
+    jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+        this: HTMLAnchorElement
+    ) {
+        downloadName = this.download;
+    });
+    act(() =>
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('.header-actions button')].find(
+                    (button) => button.textContent?.trim() === 'Export'
+                )
+            )
+        )
+    );
+    const blob = createUrl.mock.calls[0][0] as Blob;
+    const contents = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsText(blob);
+    });
+    expect(blob.type).toBe('application/json');
+    expect(JSON.parse(contents)).toEqual({ items: original.items, labels: original.labels });
+    expect(downloadName).toMatch(/^compass-workspace-\d{4}-\d{2}-\d{2}\.json$/);
+    expect(write).not.toHaveBeenCalled();
 });
 
 test('given a workspace label, it can be created, assigned, filtered, and removed cleanly', async () => {
@@ -686,6 +904,37 @@ test('given a metric, dragging it into a group is rejected', () => {
     expect(() => moveListEntry(items, 'goal/metric', 'group', 'inside')).toThrow(/Groups contain/);
 });
 
+test('given an existing goal, linking it beneath another parent preserves all existing data', () => {
+    const items = [
+        entryFixture({ id: 'old', type: 'goal', childIds: ['shared'] }),
+        entryFixture({ id: 'new', type: 'goal' }),
+        entryFixture({ id: 'shared', type: 'goal', childIds: ['metric'] }),
+        entryFixture({ id: 'metric', type: 'metric' })
+    ];
+    const linked = linkListEntry(items, 'shared', 'new');
+    expect(linked[0]).toEqual(items[0]);
+    expect(linked[1].childIds).toEqual(['shared']);
+    expect(linked.slice(2)).toEqual(items.slice(2));
+    expect(items[1].childIds).toEqual([]);
+});
+
+test.each([
+    ['goal', 'goal'],
+    ['goal', 'child'],
+    ['child', 'goal'],
+    ['metric', 'group'],
+    ['goal', 'metric'],
+    ['missing', 'goal']
+])('given an invalid link from %s to %s, no connection is created', (sourceId, parentId) => {
+    const items = [
+        entryFixture({ id: 'group', childIds: ['goal'] }),
+        entryFixture({ id: 'goal', type: 'goal', childIds: ['child'] }),
+        entryFixture({ id: 'child', type: 'goal', childIds: ['metric'] }),
+        entryFixture({ id: 'metric', type: 'metric' })
+    ];
+    expect(() => linkListEntry(items, sourceId, parentId)).toThrow(/connection/);
+});
+
 test('given root entries, dragging changes their saved list order', () => {
     const items = [
         entryFixture({ id: 'goal', type: 'goal', childIds: [] }),
@@ -704,7 +953,12 @@ test.each([
     { selector: '[data-path="parent"] .goal-name svg', selected: ['parent'], deleted: [] },
     { selector: '[data-path="parent"] .branch-toggle svg', selected: [], deleted: [] },
     { selector: '[data-path="parent"] .drag-handle svg', selected: [], deleted: [] },
-    { selector: '[data-path="parent"] .icon-button svg', selected: [], deleted: ['parent'] },
+    {
+        selector: '[data-path="parent"] [aria-label="Delete goal parent"] svg',
+        selected: [],
+        deleted: ['parent']
+    },
+    { selector: '[data-path="parent"] .link-drop-target svg', selected: [], deleted: [] },
     {
         selector: '[data-path="parent/child"] .table-parent-links button',
         selected: ['parent'],
@@ -729,6 +983,8 @@ test.each([
                     busy={false}
                     onSelect={onSelect}
                     onDelete={onDelete}
+                    onCreateGoal={() => {}}
+                    onLink={async () => true}
                     onRearrange={async () => true}
                 />,
                 container
@@ -756,6 +1012,8 @@ test('given a table column resizer, arrow keys adjust the adjacent column widths
                 busy={false}
                 onSelect={() => {}}
                 onDelete={() => {}}
+                onCreateGoal={() => {}}
+                onLink={async () => true}
                 onRearrange={async () => true}
             />,
             container
@@ -787,6 +1045,8 @@ test('given a table column resizer, pointer dragging adjusts adjacent column wid
                 busy={false}
                 onSelect={() => {}}
                 onDelete={() => {}}
+                onCreateGoal={() => {}}
+                onLink={async () => true}
                 onRearrange={async () => true}
             />,
             container
@@ -894,6 +1154,18 @@ function required<Value>(value: Value | null | undefined): Value {
     return value;
 }
 
+async function selectImportFile(contents: string): Promise<void> {
+    const file = new File([contents], 'workspace.json', { type: 'application/json' });
+    Object.defineProperty(file, 'text', { value: async () => contents });
+    const input = required(
+        container.querySelector<HTMLInputElement>('[aria-label="Import workspace JSON file"]')
+    );
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+    await act(async () => {
+        Simulate.change(input);
+    });
+}
+
 function savedGraph(): SavedGraph {
     return JSON.parse(required(localStorage.getItem('compass-preview-v1'))) as SavedGraph;
 }
@@ -925,6 +1197,16 @@ function changeValue(element: Element | null, value: string): void {
 let container: HTMLDivElement;
 
 beforeAll(() => {
+    Object.defineProperty(URL, 'createObjectURL', {
+        configurable: true,
+        writable: true,
+        value: () => 'blob:workspace'
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+        configurable: true,
+        writable: true,
+        value: () => {}
+    });
     HTMLDialogElement.prototype.showModal = function () {
         this.open = true;
     };
@@ -979,7 +1261,8 @@ test('given an unselected row, its trash action confirms deletion and preserves 
     await act(async () => {
         ReactDOM.render(<App />, container);
     });
-    expect(container.querySelectorAll('.entry-row .icon-button')).toHaveLength(3);
+    expect(container.querySelectorAll('.entry-row [aria-label^="Delete "]')).toHaveLength(3);
+    expect(container.querySelector('[aria-label="Add goal under Metric"]')).toBeNull();
     act(() => {
         Simulate.click(required(container.querySelector('[aria-label="Open group Group"]')));
     });

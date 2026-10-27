@@ -26,10 +26,12 @@ import EntryDialog from '../features/workspace/components/EntryDialog';
 import GoalList from '../features/workspace/components/GoalList';
 import ItemGraph from '../features/workspace/components/ItemGraph';
 import LabelManager from '../features/workspace/components/LabelManager';
+import WorkspaceTransfer from '../features/workspace/components/WorkspaceTransfer';
 import {
     entryTypes,
     goalCategories,
     includeAncestors,
+    linkListEntry,
     matchesAssignees,
     moveGoalToGroup,
     moveListEntry
@@ -246,6 +248,23 @@ function App() {
                             </React.Fragment>
                         ) : null}
                     </span>
+                    <WorkspaceTransfer
+                        graph={{ items, labels }}
+                        disabled={loading || busy}
+                        onImport={async (imported) => {
+                            const saved = await save(imported.items, imported.labels);
+                            if (saved) {
+                                setSelectedId(null);
+                                setDialog(null);
+                                setSearch('');
+                                setTypeFilter(typeOptions.map((option) => option.value));
+                                setAssigneeFilter([]);
+                                setLabelFilter([]);
+                                setMode('list');
+                            }
+                            return saved;
+                        }}
+                    />
                     <button
                         className="button secondary"
                         disabled={
@@ -446,6 +465,10 @@ function App() {
                                     selectedId={selectedId}
                                     busy={busy}
                                     onSelect={setSelectedId}
+                                    onCreateGoal={(parentId) => openCreate('goal', parentId)}
+                                    onLink={(sourceId, parentId) =>
+                                        save(linkListEntry(items, sourceId, parentId))
+                                    }
                                     onDelete={(path) => {
                                         const parts = path.split('/');
                                         const id = parts[parts.length - 1];

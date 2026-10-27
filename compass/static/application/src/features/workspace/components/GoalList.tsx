@@ -6,6 +6,7 @@ import {
     GitBranch,
     GripVertical,
     Layers,
+    Plus,
     Rocket,
     Target,
     Trash2
@@ -20,7 +21,7 @@ import {
     useSensor,
     useSensors
 } from '@dnd-kit/core';
-import { buildListRows, entryTypes } from '../model/entries';
+import { buildListRows, canConnect, entryTypes } from '../model/entries';
 import AssigneeChip from '../../../components/assignees/AssigneeChip';
 import LabelChip from '../../../components/labels/LabelChip';
 import IconButton from '../../../components/ui/IconButton';
@@ -75,6 +76,8 @@ interface GoalListProps {
     busy: boolean;
     onSelect: (id: string) => void;
     onDelete: (path: string) => void;
+    onCreateGoal: (parentId: string) => void;
+    onLink: (sourceId: string, parentId: string) => Promise<boolean>;
     onRearrange: (
         sourcePath: string,
         targetPath: string,
@@ -83,7 +86,9 @@ interface GoalListProps {
 }
 
 const listCollisionDetection: CollisionDetection = (args) => {
-    return args.pointerCoordinates ? pointerWithin(args) : closestCenter(args);
+    const collisions = args.pointerCoordinates ? pointerWithin(args) : closestCenter(args);
+    const link = collisions.find((collision) => String(collision.id).endsWith(':link'));
+    return args.pointerCoordinates && link ? [link] : collisions;
 };
 
 export default function GoalList({
@@ -94,6 +99,8 @@ export default function GoalList({
     busy,
     onSelect,
     onDelete,
+    onCreateGoal,
+    onLink,
     onRearrange
 }: GoalListProps) {
     const filterKey = entries.map((entry) => entry.id).join('|');
@@ -125,8 +132,13 @@ export default function GoalList({
             return;
         }
         try {
-            const saved = await onRearrange(source.path, destination.path, destination.placement);
-            if (saved && destination.placement === 'inside') {
+            const linking = destination.placement === 'link';
+            const targetId = destination.path.split('/').pop()!;
+            const saved =
+                destination.placement === 'link'
+                    ? await onLink(source.entry.id, targetId)
+                    : await onRearrange(source.path, destination.path, destination.placement);
+            if (saved && (linking || destination.placement === 'inside')) {
                 setCollapseState((current) => {
                     if (current.filterKey !== filterKey) return current;
                     const paths = new Set(current.paths);
@@ -134,7 +146,11 @@ export default function GoalList({
                     return { ...current, paths };
                 });
             }
-            setMoveStatus(saved ? `Moved ${source.entry.name}.` : 'The move could not be saved.');
+            setMoveStatus(
+                saved
+                    ? `${linking ? 'Linked' : 'Moved'} ${source.entry.name}.`
+                    : 'The change could not be saved.'
+            );
         } catch (failure) {
             setMoveStatus(
                 failure instanceof Error ? failure.message : 'The move could not be saved.'
@@ -218,6 +234,7 @@ export default function GoalList({
                                 style={{ width: `${columnWidths[index]}%` }}
                             />
                         ))}
+                        <col className="column-actions" />
                     </colgroup>
                     <thead>
                         <tr>
@@ -255,6 +272,9 @@ export default function GoalList({
                                     )}
                                 </th>
                             ))}
+                            <th scope="col" className="column-actions">
+                                <span className="visually-hidden">Actions</span>
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -293,8 +313,11 @@ export default function GoalList({
                                     selectedId={selectedId}
                                     busy={busy}
                                     onSelect={onSelect}
+                                    canLink={Boolean(
+                                        activeEntry && canConnect(items, entry, activeEntry)
+                                    )}
                                 >
-                                    {(dragHandle, dropTargets) => (
+                                    {(dragHandle, dropTargets, linkTarget) => (
                                         <React.Fragment>
                                             <th scope="row" className="hierarchy-cell column-name">
                                                 {dropTargets}
@@ -307,6 +330,7 @@ export default function GoalList({
                                                     }
                                                 >
                                                     {dragHandle}
+                                                    {linkTarget}
                                                     {hasChildren ? (
                                                         <button
                                                             type="button"
@@ -349,13 +373,6 @@ export default function GoalList({
                                                             </span>
                                                         </span>
                                                     </button>
-                                                    <IconButton
-                                                        label={`Delete ${entryTypes[entry.type].label.toLowerCase()} ${entry.name}`}
-                                                        disabled={busy}
-                                                        onClick={() => onDelete(path)}
-                                                    >
-                                                        <Trash2 size={16} aria-hidden="true" />
-                                                    </IconButton>
                                                 </div>
                                             </th>
                                             <td className="column-assignees">
@@ -421,6 +438,26 @@ export default function GoalList({
                                                 ) : (
                                                     <span className="muted">-</span>
                                                 )}
+                                            </td>
+                                            <td className="column-actions">
+                                                <div className="row-actions">
+                                                    {entry.type !== 'metric' && (
+                                                        <IconButton
+                                                            label={`Add goal under ${entry.name}`}
+                                                            disabled={busy}
+                                                            onClick={() => onCreateGoal(entry.id)}
+                                                        >
+                                                            <Plus size={16} aria-hidden="true" />
+                                                        </IconButton>
+                                                    )}
+                                                    <IconButton
+                                                        label={`Delete ${entryTypes[entry.type].label.toLowerCase()} ${entry.name}`}
+                                                        disabled={busy}
+                                                        onClick={() => onDelete(path)}
+                                                    >
+                                                        <Trash2 size={16} aria-hidden="true" />
+                                                    </IconButton>
+                                                </div>
                                             </td>
                                         </React.Fragment>
                                     )}

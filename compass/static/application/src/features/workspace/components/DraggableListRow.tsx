@@ -1,6 +1,6 @@
 import React from 'react';
 import { useDndContext, useDraggable, useDroppable } from '@dnd-kit/core';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, Link2 } from 'lucide-react';
 import type { DropPlacement, ListRow, WorkspaceEntry } from '../../../types/workspace';
 
 export interface DragEntryData {
@@ -9,7 +9,7 @@ export interface DragEntryData {
 }
 export interface DropTargetData {
     path: string;
-    placement: DropPlacement;
+    placement: DropPlacement | 'link';
 }
 
 interface DraggableListRowProps {
@@ -17,7 +17,43 @@ interface DraggableListRowProps {
     selectedId: string | null;
     busy: boolean;
     onSelect: (id: string) => void;
-    children: (dragHandle: React.ReactNode, dropTargets: React.ReactNode) => React.ReactNode;
+    canLink: boolean;
+    children: (
+        dragHandle: React.ReactNode,
+        dropTargets: React.ReactNode,
+        linkTarget: React.ReactNode
+    ) => React.ReactNode;
+}
+
+function LinkDropTarget({
+    path,
+    name,
+    busy,
+    canLink
+}: {
+    path: string;
+    name: string;
+    busy: boolean;
+    canLink: boolean;
+}) {
+    const { isOver, setNodeRef } = useDroppable({
+        id: `${path}:link`,
+        data: { path, placement: 'link' },
+        disabled: busy
+    });
+    return (
+        <button
+            ref={setNodeRef}
+            type="button"
+            className={`link-drop-target ${isOver ? 'is-over' : ''}`}
+            data-valid={canLink}
+            disabled={busy}
+            aria-label={`Link an entry under ${name}`}
+            title={`Drop an entry here to link it under ${name}`}
+        >
+            <Link2 size={16} aria-hidden="true" />
+        </button>
+    );
 }
 
 function DropZone({ path, placement, disabled }: DropTargetData & { disabled: boolean }) {
@@ -41,6 +77,7 @@ export default function DraggableListRow({
     selectedId,
     busy,
     onSelect,
+    canLink,
     children
 }: DraggableListRowProps) {
     const { entry, path, depth } = row;
@@ -92,7 +129,15 @@ export default function DraggableListRow({
                 onSelect(entry.id);
             }}
         >
-            {children(dragHandle, dropTargets)}
+            {children(
+                dragHandle,
+                dropTargets,
+                entry.type !== 'metric' ? (
+                    <LinkDropTarget path={path} name={entry.name} busy={busy} canLink={canLink} />
+                ) : (
+                    <span className="link-target-spacer" aria-hidden="true" />
+                )
+            )}
         </tr>
     );
 }

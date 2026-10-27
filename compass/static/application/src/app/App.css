@@ -27,6 +27,43 @@
 .drag-handle:active {
     cursor: grabbing;
 }
+.link-drop-target,
+.link-target-spacer {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+}
+.link-drop-target {
+    position: relative;
+    z-index: 3;
+    padding: 0;
+    border: 1px solid transparent;
+    color: var(--muted);
+    background: transparent;
+}
+.link-drop-target[data-valid='true'] {
+    border-color: var(--blue);
+    color: var(--blue);
+}
+.link-drop-target.is-over {
+    background: var(--line);
+    outline: 2px solid var(--blue);
+}
+.link-drop-target.is-over[data-valid='false'] {
+    outline-color: var(--ds-border-danger, #c9372c);
+    cursor: not-allowed;
+}
+.goal-table .column-actions {
+    width: 88px;
+}
+.row-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+}
 .row-drop-targets {
     position: absolute;
     inset: 0;
@@ -179,6 +216,7 @@
 }
 .goal-table {
     width: 100%;
+    min-width: 640px;
     border-collapse: collapse;
     table-layout: fixed;
 }
@@ -499,6 +537,15 @@
 .header-actions {
     gap: 18px;
     flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 100%;
+}
+.transfer-error {
+    flex-basis: 100%;
+    color: var(--ds-text-danger, #ae2a19);
+    overflow-wrap: anywhere;
+    font-size: 12px;
 }
 .save-status {
     display: inline-flex;
