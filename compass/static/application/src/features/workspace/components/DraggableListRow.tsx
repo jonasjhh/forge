@@ -6,6 +6,7 @@ import type { DropPlacement, ListRow, WorkspaceEntry } from '../../../types/work
 export interface DragEntryData {
     path: string;
     entry: WorkspaceEntry;
+    mode: 'move' | 'link';
 }
 export interface DropTargetData {
     path: string;
@@ -27,29 +28,45 @@ interface DraggableListRowProps {
 
 function LinkDropTarget({
     path,
-    name,
+    entry,
     busy,
     canLink
 }: {
     path: string;
-    name: string;
+    entry: WorkspaceEntry;
     busy: boolean;
     canLink: boolean;
 }) {
-    const { isOver, setNodeRef } = useDroppable({
+    const { isOver, setNodeRef: setDropRef } = useDroppable({
         id: `${path}:link`,
         data: { path, placement: 'link' },
+        disabled: busy || entry.type === 'metric'
+    });
+    const {
+        attributes,
+        listeners,
+        setNodeRef: setDragRef,
+        setActivatorNodeRef
+    } = useDraggable({
+        id: `${path}:link-source`,
+        data: { path, entry, mode: 'link' },
         disabled: busy
     });
     return (
         <button
-            ref={setNodeRef}
+            ref={(element) => {
+                setDropRef(element);
+                setDragRef(element);
+                setActivatorNodeRef(element);
+            }}
             type="button"
             className={`link-drop-target ${isOver ? 'is-over' : ''}`}
             data-valid={canLink}
             disabled={busy}
-            aria-label={`Link an entry under ${name}`}
-            title={`Drop an entry here to link it under ${name}`}
+            {...attributes}
+            {...listeners}
+            aria-label={`Link ${entry.name}`}
+            title={`Drag to link ${entry.name} under another entry`}
         >
             <Link2 size={16} aria-hidden="true" />
         </button>
@@ -84,7 +101,7 @@ export default function DraggableListRow({
     const { active } = useDndContext();
     const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({
         id: path,
-        data: { path, entry },
+        data: { path, entry, mode: 'move' },
         disabled: busy
     });
     const dragHandle = (
@@ -103,11 +120,23 @@ export default function DraggableListRow({
     );
     const dropTargets = (
         <div className="row-drop-targets" data-active={Boolean(active)}>
-            <DropZone path={path} placement="before" disabled={busy || active?.id === path} />
+            <DropZone
+                path={path}
+                placement="before"
+                disabled={busy || active?.data.current?.path === path}
+            />
             {entry.type !== 'metric' && (
-                <DropZone path={path} placement="inside" disabled={busy || active?.id === path} />
+                <DropZone
+                    path={path}
+                    placement="inside"
+                    disabled={busy || active?.data.current?.path === path}
+                />
             )}
-            <DropZone path={path} placement="after" disabled={busy || active?.id === path} />
+            <DropZone
+                path={path}
+                placement="after"
+                disabled={busy || active?.data.current?.path === path}
+            />
         </div>
     );
     return (
@@ -132,11 +161,7 @@ export default function DraggableListRow({
             {children(
                 dragHandle,
                 dropTargets,
-                entry.type !== 'metric' ? (
-                    <LinkDropTarget path={path} name={entry.name} busy={busy} canLink={canLink} />
-                ) : (
-                    <span className="link-target-spacer" aria-hidden="true" />
-                )
+                <LinkDropTarget path={path} entry={entry} busy={busy} canLink={canLink} />
             )}
         </tr>
     );

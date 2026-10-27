@@ -6,6 +6,7 @@ import {
     GitBranch,
     GripVertical,
     Layers,
+    Link2,
     Plus,
     Rocket,
     Target,
@@ -114,6 +115,7 @@ export default function GoalList({
     const projectedRows = buildListRows(items, entries, collapsedPaths, rowLimit + 1);
     const rows = projectedRows.slice(0, rowLimit);
     const [activeEntry, setActiveEntry] = useState<WorkspaceEntry | null>(null);
+    const [linkingDrag, setLinkingDrag] = useState(false);
     const [moveStatus, setMoveStatus] = useState('');
     const [columnWidths, setColumnWidths] = useState(initialColumnWidths);
     const tableRef = useRef<HTMLTableElement>(null);
@@ -132,12 +134,13 @@ export default function GoalList({
             return;
         }
         try {
-            const linking = destination.placement === 'link';
+            const placement = source.mode === 'link' ? 'link' : destination.placement;
+            const linking = placement === 'link';
             const targetId = destination.path.split('/').pop()!;
             const saved =
-                destination.placement === 'link'
+                placement === 'link'
                     ? await onLink(source.entry.id, targetId)
-                    : await onRearrange(source.path, destination.path, destination.placement);
+                    : await onRearrange(source.path, destination.path, placement);
             if (saved && (linking || destination.placement === 'inside')) {
                 setCollapseState((current) => {
                     if (current.filterKey !== filterKey) return current;
@@ -212,6 +215,7 @@ export default function GoalList({
                 collisionDetection={listCollisionDetection}
                 onDragStart={({ active }) => {
                     setMoveStatus('');
+                    setLinkingDrag(active.data.current?.mode === 'link');
                     setActiveEntry(
                         (active.data.current as DragEntryData | undefined)?.entry || null
                     );
@@ -469,7 +473,7 @@ export default function GoalList({
                 <DragOverlay dropAnimation={null}>
                     {activeEntry && (
                         <div className="drag-preview">
-                            <GripVertical size={16} />
+                            {linkingDrag ? <Link2 size={16} /> : <GripVertical size={16} />}
                             <span>{activeEntry.name}</span>
                         </div>
                     )}

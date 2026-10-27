@@ -1000,6 +1000,114 @@ test.each([
     }
 );
 
+test.each([
+    { sourceHandle: '.link-drop-target', destination: '.drop-inside', preservesParent: true },
+    { sourceHandle: '.drag-handle', destination: '.link-drop-target', preservesParent: true },
+    { sourceHandle: '.drag-handle', destination: '.drop-inside', preservesParent: false }
+])(
+    'given a drag from $sourceHandle to $destination, its save uses the correct link or move operation',
+    async ({ sourceHandle, destination, preservesParent }) => {
+        const items = [
+            entryFixture({ id: 'old', type: 'goal', childIds: ['source'] }),
+            entryFixture({ id: 'source', type: 'goal', childIds: ['metric'] }),
+            entryFixture({ id: 'metric', type: 'metric' }),
+            entryFixture({ id: 'target', type: 'goal' })
+        ];
+        localStorage.setItem(
+            'compass-preview-v1',
+            JSON.stringify({ items, labels: [], updatedAt: null })
+        );
+        jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+            this: HTMLElement
+        ) {
+            const row = this.closest<HTMLElement>('.entry-row');
+            const rowTop = row
+                ? ['old', 'source', 'metric', 'target'].indexOf(row.dataset.entryId!) * 80
+                : 0;
+            let top = rowTop;
+            let left = 0;
+            let width = 600;
+            let height = 80;
+            if (this.classList.contains('drop-before')) height = 20;
+            if (this.classList.contains('drop-inside')) {
+                top += 20;
+                height = 40;
+            }
+            if (this.classList.contains('drop-after')) {
+                top += 60;
+                height = 20;
+            }
+            if (this.classList.contains('link-drop-target')) {
+                left = 24;
+                top += 8;
+                width = 24;
+                height = 24;
+            }
+            return {
+                x: left,
+                y: top,
+                left,
+                top,
+                width,
+                height,
+                right: left + width,
+                bottom: top + height
+            } as DOMRect;
+        });
+        await act(async () => {
+            ReactDOM.render(<App />, container);
+        });
+        const source = required(
+            container.querySelector<HTMLElement>(`[data-entry-id="source"] ${sourceHandle}`)
+        );
+        const target = required(
+            container.querySelector<HTMLElement>(`[data-entry-id="target"] ${destination}`)
+        );
+        const sourceBounds = source.getBoundingClientRect();
+        const targetBounds = target.getBoundingClientRect();
+        function pointer(
+            targetElement: EventTarget,
+            type: string,
+            clientX: number,
+            clientY: number
+        ): void {
+            const event = new MouseEvent(type, {
+                bubbles: true,
+                button: 0,
+                buttons: type === 'pointerup' ? 0 : 1,
+                clientX,
+                clientY
+            });
+            Object.defineProperty(event, 'isPrimary', { value: true });
+            targetElement.dispatchEvent(event);
+        }
+        act(() => pointer(source, 'pointerdown', sourceBounds.left + 5, sourceBounds.top + 10));
+        act(() => pointer(document, 'pointermove', sourceBounds.left + 15, sourceBounds.top + 10));
+        act(() =>
+            pointer(
+                document,
+                'pointermove',
+                targetBounds.left + targetBounds.width / 2,
+                targetBounds.top + targetBounds.height / 2
+            )
+        );
+        await act(async () =>
+            pointer(
+                document,
+                'pointerup',
+                targetBounds.left + targetBounds.width / 2,
+                targetBounds.top + targetBounds.height / 2
+            )
+        );
+        const saved = savedGraph().items;
+        expect(required(saved.find((entry) => entry.id === 'target')).childIds).toEqual(['source']);
+        expect(required(saved.find((entry) => entry.id === 'old')).childIds).toEqual(
+            preservesParent ? ['source'] : []
+        );
+        expect(required(saved.find((entry) => entry.id === 'source')).childIds).toEqual(['metric']);
+    }
+);
+
 test('given a table column resizer, arrow keys adjust the adjacent column widths', () => {
     const items = [entryFixture({ id: 'group', type: 'group' })];
     act(() => {

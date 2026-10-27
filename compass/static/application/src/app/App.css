@@ -27,8 +27,7 @@
 .drag-handle:active {
     cursor: grabbing;
 }
-.link-drop-target,
-.link-target-spacer {
+.link-drop-target {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -43,6 +42,8 @@
     border: 1px solid transparent;
     color: var(--muted);
     background: transparent;
+    cursor: grab;
+    touch-action: none;
 }
 .link-drop-target[data-valid='true'] {
     border-color: var(--blue);
