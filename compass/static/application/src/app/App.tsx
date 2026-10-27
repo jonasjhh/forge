@@ -371,6 +371,10 @@ function App() {
                                     selectedId={selectedId}
                                     busy={busy}
                                     onSelect={setSelectedId}
+                                    onDelete={(id) => {
+                                        setSelectedId(id);
+                                        setDialog('delete');
+                                    }}
                                     onRearrange={(sourcePath, targetPath, placement) =>
                                         save(
                                             moveListEntry(items, sourcePath, targetPath, placement)

@@ -125,6 +125,48 @@ test('given a goal category, creating and changing it updates the list label and
     expect(typeFilter.querySelector('input[value="Delivery"]')).not.toBeNull();
 });
 
+test.each([0, 1])(
+    'given sidebar save button %s, it saves the same edit form',
+    async (buttonIndex) => {
+        localStorage.setItem(
+            'compass-preview-v1',
+            JSON.stringify({
+                items: [entryFixture({ id: 'goal', type: 'goal', name: 'Original goal' })],
+                updatedAt: null
+            })
+        );
+        await act(async () => {
+            ReactDOM.render(<App />, container);
+        });
+        act(() => {
+            Simulate.click(
+                required(container.querySelector('[aria-label="Open goal Original goal"]'))
+            );
+        });
+        const sidebar = required(container.querySelector('.details'));
+        const buttons = sidebar.querySelectorAll<HTMLButtonElement>('.save-button');
+        expect(buttons).toHaveLength(2);
+        expect(sidebar.children[1].contains(buttons[0])).toBe(true);
+        expect(sidebar.lastElementChild?.contains(buttons[1])).toBe(true);
+        expect(buttons[0].form?.id).toBe('entry-edit-form');
+        expect(buttons[1].form).toBe(buttons[0].form);
+        expect(buttons[0].disabled).toBe(true);
+        expect(buttons[1].disabled).toBe(true);
+        act(() => changeValue(required(container.querySelector('#item-name')), ''));
+        expect(buttons[0].disabled).toBe(true);
+        expect(buttons[1].disabled).toBe(true);
+        act(() => changeValue(required(container.querySelector('#item-name')), 'Updated goal'));
+        expect(buttons[0].disabled).toBe(false);
+        expect(buttons[1].disabled).toBe(false);
+        await act(async () => {
+            buttons[buttonIndex].click();
+        });
+        expect(savedGraph().items[0].name).toBe('Updated goal');
+        expect(buttons[0].disabled).toBe(true);
+        expect(buttons[1].disabled).toBe(true);
+    }
+);
+
 test('given a workspace label, it can be created, assigned, filtered, and removed cleanly', async () => {
     localStorage.setItem(
         'compass-preview-v1',
@@ -631,6 +673,7 @@ test('given a table column resizer, arrow keys adjust the adjacent column widths
                 selectedId={null}
                 busy={false}
                 onSelect={() => {}}
+                onDelete={() => {}}
                 onRearrange={async () => true}
             />,
             container
@@ -661,6 +704,7 @@ test('given a table column resizer, pointer dragging adjusts adjacent column wid
                 selectedId={null}
                 busy={false}
                 onSelect={() => {}}
+                onDelete={() => {}}
                 onRearrange={async () => true}
             />,
             container
@@ -836,6 +880,46 @@ afterEach(() => {
     });
     container.remove();
     jest.restoreAllMocks();
+});
+
+test('given an unselected row, its trash action confirms deletion and preserves its child', async () => {
+    localStorage.setItem(
+        'compass-preview-v1',
+        JSON.stringify({
+            items: [
+                entryFixture({ id: 'group', name: 'Group', childIds: ['goal'] }),
+                entryFixture({ id: 'goal', type: 'goal', name: 'Goal', childIds: ['metric'] }),
+                entryFixture({ id: 'metric', type: 'metric', name: 'Metric' })
+            ],
+            updatedAt: null
+        })
+    );
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    expect(container.querySelectorAll('.entry-row .icon-button')).toHaveLength(3);
+    act(() => {
+        Simulate.click(required(container.querySelector('[aria-label="Open group Group"]')));
+    });
+    act(() => {
+        Simulate.click(required(container.querySelector('[aria-label="Delete goal Goal"]')));
+    });
+    expect(container.querySelector('dialog strong')?.textContent).toBe('Goal');
+    expect(savedGraph().items).toHaveLength(3);
+    act(() => {
+        Simulate.click(required(container.querySelector('[aria-label="Close dialog"]')));
+    });
+    expect(savedGraph().items).toHaveLength(3);
+    act(() => {
+        Simulate.click(required(container.querySelector('[aria-label="Delete goal Goal"]')));
+    });
+    await act(async () => {
+        Simulate.submit(required(container.querySelector('dialog form')));
+    });
+    expect(savedGraph().items.map((entry) => entry.id)).toEqual(['group', 'metric']);
+    expect(savedGraph().items[0].childIds).toEqual([]);
+    expect(container.querySelector('[aria-label="Delete goal Goal"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Delete metric Metric"]')).not.toBeNull();
 });
 
 test('given a selected parent, deleting it preserves its child and clears the selection', async () => {

@@ -115,6 +115,17 @@ export default function EntryDetails({
             ? 'Sub-goal'
             : entryTypes[item.type].label;
     const GoalCategoryIcon = goalCategoryIcons[goalCategory];
+    const saveButton = (
+        <button
+            className="button secondary save-button"
+            type="submit"
+            form="entry-edit-form"
+            disabled={busy || !name.trim() || !changed}
+        >
+            <Check size={16} />
+            Save changes
+        </button>
+    );
 
     return (
         <aside className="details" aria-label={`${typeLabel} details`}>
@@ -131,7 +142,9 @@ export default function EntryDetails({
                     <Trash2 size={17} />
                 </IconButton>
             </div>
+            <div className="details-save-actions">{saveButton}</div>
             <form
+                id="entry-edit-form"
                 onSubmit={(event) => {
                     event.preventDefault();
                     onSave(draft);
@@ -214,14 +227,6 @@ export default function EntryDetails({
                         id="edit-assignees"
                     />
                 )}
-                <button
-                    className="button secondary save-button"
-                    type="submit"
-                    disabled={busy || !name.trim() || !changed}
-                >
-                    <Check size={16} />
-                    Save changes
-                </button>
             </form>
             {item.type !== 'metric' && (
                 <section className="relationships" aria-labelledby="children-heading">
@@ -421,6 +426,7 @@ export default function EntryDetails({
                     </form>
                 )}
             </section>
+            <div className="details-save-actions">{saveButton}</div>
         </aside>
     );
 }

@@ -7,7 +7,8 @@ import {
     GripVertical,
     Layers,
     Rocket,
-    Target
+    Target,
+    Trash2
 } from 'lucide-react';
 import {
     closestCenter,
@@ -22,6 +23,7 @@ import {
 import { buildListRows, entryTypes } from '../model/entries';
 import AssigneeChip from '../../../components/assignees/AssigneeChip';
 import LabelChip from '../../../components/labels/LabelChip';
+import IconButton from '../../../components/ui/IconButton';
 import DraggableListRow from './DraggableListRow';
 import type { CollisionDetection, DragEndEvent } from '@dnd-kit/core';
 import type { DragEntryData, DropTargetData } from './DraggableListRow';
@@ -72,6 +74,7 @@ interface GoalListProps {
     selectedId: string | null;
     busy: boolean;
     onSelect: (id: string) => void;
+    onDelete: (id: string) => void;
     onRearrange: (
         sourcePath: string,
         targetPath: string,
@@ -90,6 +93,7 @@ export default function GoalList({
     selectedId,
     busy,
     onSelect,
+    onDelete,
     onRearrange
 }: GoalListProps) {
     const filterKey = entries.map((entry) => entry.id).join('|');
@@ -344,6 +348,13 @@ export default function GoalList({
                                                             </span>
                                                         </span>
                                                     </button>
+                                                    <IconButton
+                                                        label={`Delete ${entryTypes[entry.type].label.toLowerCase()} ${entry.name}`}
+                                                        disabled={busy}
+                                                        onClick={() => onDelete(entry.id)}
+                                                    >
+                                                        <Trash2 size={16} aria-hidden="true" />
+                                                    </IconButton>
                                                 </div>
                                             </th>
                                             <td className="column-assignees">

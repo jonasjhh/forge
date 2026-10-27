@@ -808,6 +808,9 @@ select:focus {
 .save-button {
     margin-top: 12px;
 }
+.details-save-actions {
+    grid-column: 1 / -1;
+}
 .relationships {
     margin-top: 24px;
     padding-top: 20px;
