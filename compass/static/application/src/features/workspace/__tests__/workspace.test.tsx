@@ -1043,7 +1043,10 @@ test.each([
             entryFixture({ id: 'old', type: 'goal', childIds: ['source'] }),
             entryFixture({ id: 'source', type: 'goal', childIds: ['metric'] }),
             entryFixture({ id: 'metric', type: 'metric' }),
-            entryFixture({ id: 'target', type: 'goal' })
+            entryFixture({ id: 'target', type: 'goal', childIds: ['target-child'] }),
+            entryFixture({ id: 'target-child', type: 'goal' }),
+            entryFixture({ id: 'unrelated', type: 'goal', childIds: ['hidden-child'] }),
+            entryFixture({ id: 'hidden-child', type: 'goal' })
         ];
         localStorage.setItem(
             'compass-preview-v1',
@@ -1054,7 +1057,15 @@ test.each([
         ) {
             const row = this.closest<HTMLElement>('.entry-row');
             const rowTop = row
-                ? ['old', 'source', 'metric', 'target'].indexOf(row.dataset.entryId!) * 80
+                ? [
+                      'old',
+                      'source',
+                      'metric',
+                      'target',
+                      'target-child',
+                      'unrelated',
+                      'hidden-child'
+                  ].indexOf(row.dataset.entryId!) * 80
                 : 0;
             let top = rowTop;
             let left = 0;
@@ -1089,6 +1100,16 @@ test.each([
         await act(async () => {
             ReactDOM.render(<App />, container);
         });
+        act(() =>
+            Simulate.click(required(container.querySelector('[aria-label="Collapse source"]')))
+        );
+        act(() =>
+            Simulate.click(required(container.querySelector('[aria-label="Collapse target"]')))
+        );
+        act(() =>
+            Simulate.click(required(container.querySelector('[aria-label="Collapse unrelated"]')))
+        );
+        const table = required(container.querySelector('.goal-table'));
         const source = required(
             container.querySelector<HTMLElement>(`[data-entry-id="source"] ${sourceHandle}`)
         );
@@ -1132,11 +1153,23 @@ test.each([
             )
         );
         const saved = savedGraph().items;
-        expect(required(saved.find((entry) => entry.id === 'target')).childIds).toEqual(['source']);
+        expect(required(saved.find((entry) => entry.id === 'target')).childIds).toEqual([
+            'target-child',
+            'source'
+        ]);
         expect(required(saved.find((entry) => entry.id === 'old')).childIds).toEqual(
             preservesParent ? ['source'] : []
         );
         expect(required(saved.find((entry) => entry.id === 'source')).childIds).toEqual(['metric']);
+        expect(container.querySelector('.goal-table')).toBe(table);
+        expect(container.querySelector('[aria-label="Expand unrelated"]')).not.toBeNull();
+        expect(container.querySelector('[data-path="unrelated/hidden-child"]')).toBeNull();
+        expect(container.querySelector('[aria-label="Collapse target"]')).not.toBeNull();
+        expect(container.querySelector('[data-path="target/target-child"]')).not.toBeNull();
+        expect(container.querySelector('[data-path="old/source/metric"]')).toBeNull();
+        expect(Boolean(container.querySelector('[data-path="target/source/metric"]'))).toBe(
+            preservesParent
+        );
     }
 );
 
@@ -2354,6 +2387,41 @@ test('given nested rows, hierarchy guides follow siblings and stop at branch end
             .querySelector('.hierarchy-guide-branch')
             ?.classList.contains('hierarchy-guide-continues')
     ).toBe(true);
+});
+
+test('given collapsed branches, reordering roots preserves the current expansion state', () => {
+    const initial = [
+        entryFixture({ id: 'first', type: 'goal', name: 'First', childIds: ['child'] }),
+        entryFixture({ id: 'child', type: 'goal', name: 'Child' }),
+        entryFixture({ id: 'second', type: 'goal', name: 'Second', childIds: ['other'] }),
+        entryFixture({ id: 'other', type: 'goal', name: 'Other' })
+    ];
+    const renderList = (items: WorkspaceEntry[]) => {
+        ReactDOM.render(
+            <GoalList
+                items={items}
+                labels={[]}
+                entries={items}
+                selectedId={null}
+                busy={false}
+                onSelect={() => {}}
+                onDelete={() => {}}
+                onCreateGoal={() => {}}
+                onLink={async () => true}
+                onRearrange={async () => true}
+            />,
+            container
+        );
+    };
+    act(() => renderList(initial));
+    act(() => Simulate.click(required(container.querySelector('[aria-label="Collapse First"]'))));
+    expect(container.querySelector('[data-path="first/child"]')).toBeNull();
+    act(() => renderList(moveListEntry(initial, 'second', 'first', 'before')));
+    expect(
+        [...container.querySelectorAll<HTMLElement>('.entry-row')].map((row) => row.dataset.path)
+    ).toEqual(['second', 'second/other', 'first']);
+    expect(container.querySelector('[aria-label="Expand First"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Collapse Second"]')).not.toBeNull();
 });
 
 test('given a collapsed group, descendants stay hidden until that branch is expanded', () => {

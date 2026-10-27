@@ -104,7 +104,10 @@ export default function GoalList({
     onLink,
     onRearrange
 }: GoalListProps) {
-    const filterKey = entries.map((entry) => entry.id).join('|');
+    const filterKey = entries
+        .map((entry) => entry.id)
+        .sort()
+        .join('|');
     const [collapseState, setCollapseState] = useState(() => ({
         filterKey,
         paths: new Set<string>()
@@ -157,11 +160,29 @@ export default function GoalList({
                 placement === 'link'
                     ? await onLink(source.entry.id, targetId)
                     : await onRearrange(source.path, destination.path, placement);
-            if (saved && (linking || destination.placement === 'inside')) {
+            if (saved) {
                 setCollapseState((current) => {
                     if (current.filterKey !== filterKey) return current;
-                    const paths = new Set(current.paths);
-                    paths.delete(destination.path);
+                    const parentPath =
+                        destination.placement === 'inside'
+                            ? destination.path
+                            : destination.path.split('/').slice(0, -1).join('/');
+                    const movedPath = parentPath
+                        ? `${parentPath}/${source.entry.id}`
+                        : source.entry.id;
+                    const paths = new Set(
+                        [...current.paths].map((path) => {
+                            if (
+                                !linking &&
+                                (path === source.path || path.startsWith(`${source.path}/`))
+                            ) {
+                                return movedPath + path.slice(source.path.length);
+                            }
+                            return path;
+                        })
+                    );
+                    if (linking || destination.placement === 'inside')
+                        paths.delete(destination.path);
                     return { ...current, paths };
                 });
             }
