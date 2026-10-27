@@ -114,6 +114,22 @@ export default function GoalList({
         collapseState.filterKey === filterKey ? collapseState.paths : new Set<string>();
     const projectedRows = buildListRows(items, entries, collapsedPaths, rowLimit + 1);
     const rows = projectedRows.slice(0, rowLimit);
+    const followingSiblings = new Map<string, boolean>();
+    const nextPaths: string[] = [];
+    for (let index = projectedRows.length - 1; index >= 0; index--) {
+        const row = projectedRows[index];
+        const nextPath = nextPaths[row.depth];
+        followingSiblings.set(
+            row.path,
+            Boolean(
+                nextPath &&
+                nextPath.split('/').slice(0, -1).join('/') ===
+                    row.path.split('/').slice(0, -1).join('/')
+            )
+        );
+        nextPaths.length = row.depth + 1;
+        nextPaths[row.depth] = row.path;
+    }
     const [activeEntry, setActiveEntry] = useState<WorkspaceEntry | null>(null);
     const [linkingDrag, setLinkingDrag] = useState(false);
     const [moveStatus, setMoveStatus] = useState('');
@@ -325,14 +341,37 @@ export default function GoalList({
                                         <React.Fragment>
                                             <th scope="row" className="hierarchy-cell column-name">
                                                 {dropTargets}
-                                                <div
-                                                    className="hierarchy-name"
-                                                    style={
-                                                        {
-                                                            '--row-depth': depth
-                                                        } as React.CSSProperties
-                                                    }
-                                                >
+                                                {depth > 0 && (
+                                                    <span
+                                                        className="hierarchy-guides"
+                                                        aria-hidden="true"
+                                                    >
+                                                        {path
+                                                            .split('/')
+                                                            .slice(0, -1)
+                                                            .map((ancestorId, level) => {
+                                                                const branchPath = path
+                                                                    .split('/')
+                                                                    .slice(0, level + 2)
+                                                                    .join('/');
+                                                                const continues =
+                                                                    followingSiblings.get(
+                                                                        branchPath
+                                                                    );
+                                                                const current = level === depth - 1;
+                                                                return (
+                                                                    <span
+                                                                        key={ancestorId}
+                                                                        className={`hierarchy-guide ${current ? 'hierarchy-guide-branch' : ''} ${continues ? 'hierarchy-guide-continues' : ''}`}
+                                                                        data-branch-path={
+                                                                            branchPath
+                                                                        }
+                                                                    />
+                                                                );
+                                                            })}
+                                                    </span>
+                                                )}
+                                                <div className="hierarchy-name">
                                                     {dragHandle}
                                                     {linkTarget}
                                                     {hasChildren ? (

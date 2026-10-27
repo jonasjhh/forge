@@ -138,8 +138,42 @@
     display: flex;
     align-items: flex-start;
     gap: 2px;
-    padding-inline-start: min(calc(var(--row-depth) * 20px), 35%);
+    padding-inline-start: calc(var(--row-depth) * var(--hierarchy-step));
     min-width: 0;
+}
+.hierarchy-guides {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: var(--hierarchy-inset);
+    display: flex;
+    width: calc(var(--row-depth) * var(--hierarchy-step));
+    pointer-events: none;
+}
+.hierarchy-guide {
+    position: relative;
+    flex: 0 0 var(--hierarchy-step);
+}
+.hierarchy-guide::before {
+    position: absolute;
+    inset-inline-start: 50%;
+    inset-block: 0;
+    border-inline-start: 1px solid var(--ds-border, #b3b9c4);
+}
+.hierarchy-guide-continues::before,
+.hierarchy-guide-branch::before {
+    content: '';
+}
+.hierarchy-guide-branch:not(.hierarchy-guide-continues)::before {
+    inset-block-end: auto;
+    height: var(--hierarchy-junction);
+}
+.hierarchy-guide-branch::after {
+    content: '';
+    position: absolute;
+    inset-block-start: var(--hierarchy-junction);
+    inset-inline-start: 50%;
+    width: 50%;
+    border-block-start: 1px solid var(--ds-border, #b3b9c4);
 }
 .hierarchy-name .goal-name {
     min-width: 0;
@@ -216,6 +250,9 @@
     padding: 16px;
 }
 .goal-table {
+    --hierarchy-step: 28px;
+    --hierarchy-inset: 20px;
+    --hierarchy-junction: 23px;
     width: 100%;
     min-width: 640px;
     border-collapse: collapse;
@@ -381,6 +418,10 @@
     }
     .goal-table th:first-child {
         padding-left: 12px;
+    }
+    .goal-table {
+        --hierarchy-inset: 12px;
+        --hierarchy-junction: 22px;
     }
     .goal-table .column-assignees {
         display: table-cell;

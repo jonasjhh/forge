@@ -2291,6 +2291,71 @@ test('given a shared sub-goal, it appears beneath each parent using the same sav
     ]);
 });
 
+test('given nested rows, hierarchy guides follow siblings and stop at branch ends after collapsing', () => {
+    const items = [
+        entryFixture({ id: 'group', name: 'Group', childIds: ['first', 'second'] }),
+        entryFixture({ id: 'first', type: 'goal', name: 'First', childIds: ['shared'] }),
+        entryFixture({ id: 'second', type: 'goal', name: 'Second', childIds: ['shared'] }),
+        entryFixture({ id: 'shared', type: 'goal', name: 'Shared', childIds: ['metric'] }),
+        entryFixture({ id: 'metric', type: 'metric', name: 'Metric' })
+    ];
+    act(() => {
+        ReactDOM.render(
+            <GoalList
+                items={items}
+                labels={[]}
+                entries={items}
+                selectedId={null}
+                busy={false}
+                onSelect={() => {}}
+                onDelete={() => {}}
+                onCreateGoal={() => {}}
+                onLink={async () => true}
+                onRearrange={async () => true}
+            />,
+            container
+        );
+    });
+    const row = (path: string) =>
+        required(container.querySelector<HTMLElement>(`[data-path="${path}"]`));
+    expect(row('group').querySelector('.hierarchy-guides')).toBeNull();
+    expect(
+        row('group/first')
+            .querySelector('.hierarchy-guide-branch')
+            ?.classList.contains('hierarchy-guide-continues')
+    ).toBe(true);
+    expect(
+        row('group/second')
+            .querySelector('.hierarchy-guide-branch')
+            ?.classList.contains('hierarchy-guide-continues')
+    ).toBe(false);
+    expect(
+        row('group/first/shared')
+            .querySelector('.hierarchy-guide')
+            ?.classList.contains('hierarchy-guide-continues')
+    ).toBe(true);
+    expect(
+        row('group/second/shared')
+            .querySelector('.hierarchy-guide')
+            ?.classList.contains('hierarchy-guide-continues')
+    ).toBe(false);
+    expect(row('group/first/shared/metric').querySelectorAll('.hierarchy-guide')).toHaveLength(3);
+    expect(row('group/first/shared/metric').style.getPropertyValue('--row-depth')).toBe('3');
+    expect(
+        row('group/first/shared/metric')
+            .querySelector('.hierarchy-guides')
+            ?.getAttribute('aria-hidden')
+    ).toBe('true');
+    act(() => Simulate.click(required(row('group/first').querySelector('.branch-toggle'))));
+    expect(container.querySelector('[data-path="group/first/shared"]')).toBeNull();
+    expect(row('group/second/shared').querySelectorAll('.hierarchy-guide')).toHaveLength(2);
+    expect(
+        row('group/first')
+            .querySelector('.hierarchy-guide-branch')
+            ?.classList.contains('hierarchy-guide-continues')
+    ).toBe(true);
+});
+
 test('given a collapsed group, descendants stay hidden until that branch is expanded', () => {
     const items = [
         entryFixture({ id: 'group', type: 'group', childIds: ['goal'] }),

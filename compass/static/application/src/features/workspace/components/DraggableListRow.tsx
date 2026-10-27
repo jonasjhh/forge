@@ -145,6 +145,7 @@ export default function DraggableListRow({
             data-entry-id={entry.id}
             data-depth={depth}
             data-path={path}
+            style={{ '--row-depth': depth } as React.CSSProperties}
             className={`entry-row entry-row-${entry.type} ${selectedId === entry.id ? 'selected-row' : ''} ${isDragging ? 'is-dragging' : ''}`}
             onClick={(event) => {
                 if (active || isDragging) return;
