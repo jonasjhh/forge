@@ -74,7 +74,7 @@ interface GoalListProps {
     selectedId: string | null;
     busy: boolean;
     onSelect: (id: string) => void;
-    onDelete: (id: string) => void;
+    onDelete: (path: string) => void;
     onRearrange: (
         sourcePath: string,
         targetPath: string,
@@ -292,6 +292,7 @@ export default function GoalList({
                                     row={{ entry, depth, path, hasChildren }}
                                     selectedId={selectedId}
                                     busy={busy}
+                                    onSelect={onSelect}
                                 >
                                     {(dragHandle, dropTargets) => (
                                         <React.Fragment>
@@ -351,7 +352,7 @@ export default function GoalList({
                                                     <IconButton
                                                         label={`Delete ${entryTypes[entry.type].label.toLowerCase()} ${entry.name}`}
                                                         disabled={busy}
-                                                        onClick={() => onDelete(entry.id)}
+                                                        onClick={() => onDelete(path)}
                                                     >
                                                         <Trash2 size={16} aria-hidden="true" />
                                                     </IconButton>

@@ -18,6 +18,7 @@ import type {
 interface EntryDialogProps {
     kind: 'create' | 'delete';
     item?: WorkspaceEntry;
+    deleteParent?: WorkspaceEntry;
     items: WorkspaceEntry[];
     labels: WorkspaceLabel[];
     initialType: EntryType;
@@ -31,6 +32,7 @@ interface EntryDialogProps {
 export default function EntryDialog({
     kind,
     item,
+    deleteParent,
     items,
     labels,
     initialType,
@@ -99,7 +101,11 @@ export default function EntryDialog({
             >
                 <div className="dialog-heading">
                     <h2 id="dialog-title">
-                        {kind === 'delete' ? `Delete ${label}?` : `New ${label}`}
+                        {kind === 'delete'
+                            ? deleteParent
+                                ? 'Remove connection?'
+                                : `Delete ${label}?`
+                            : `New ${label}`}
                     </h2>
                     <IconButton label="Close dialog" disabled={busy} onClick={onClose}>
                         <X size={18} />
@@ -112,8 +118,18 @@ export default function EntryDialog({
                 )}
                 {kind === 'delete' ? (
                     <p className="delete-message">
-                        Delete <strong>{item?.name}</strong> and its connections? Its contents will
-                        remain in the workspace.
+                        {deleteParent ? (
+                            <React.Fragment>
+                                Remove <strong>{item?.name}</strong> from{' '}
+                                <strong>{deleteParent.name}</strong>? The item, its other
+                                connections, and its contents will remain in the workspace.
+                            </React.Fragment>
+                        ) : (
+                            <React.Fragment>
+                                Delete <strong>{item?.name}</strong> and its connections? Its
+                                contents will remain in the workspace.
+                            </React.Fragment>
+                        )}
                     </p>
                 ) : (
                     <React.Fragment>
@@ -240,7 +256,11 @@ export default function EntryDialog({
                         }
                     >
                         {busy && <LoaderCircle size={16} className="spin" />}
-                        {kind === 'delete' ? `Delete ${label}` : `Create ${label}`}
+                        {kind === 'delete'
+                            ? deleteParent
+                                ? 'Remove connection'
+                                : `Delete ${label}`
+                            : `Create ${label}`}
                     </button>
                 </div>
             </form>

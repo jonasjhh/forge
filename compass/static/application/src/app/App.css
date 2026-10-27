@@ -1,5 +1,6 @@
 .entry-row {
     position: relative;
+    cursor: pointer;
 }
 .entry-row.is-dragging {
     opacity: 0.35;

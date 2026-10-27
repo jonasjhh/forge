@@ -64,6 +64,7 @@ function App() {
     const [error, setError] = useState('');
     const [updatedAt, setUpdatedAt] = useState<string | null>(null);
     const [dialog, setDialog] = useState<'create' | 'delete' | null>(null);
+    const [deleteParentId, setDeleteParentId] = useState<string | null>(null);
     const [createType, setCreateType] = useState<EntryType>('group');
     const [createParentId, setCreateParentId] = useState('');
     const [typeFilter, setTypeFilter] = useState<TypeFilter[]>(() =>
@@ -371,7 +372,16 @@ function App() {
                                     selectedId={selectedId}
                                     busy={busy}
                                     onSelect={setSelectedId}
-                                    onDelete={(id) => {
+                                    onDelete={(path) => {
+                                        const parts = path.split('/');
+                                        const id = parts[parts.length - 1];
+                                        const parentId = parts[parts.length - 2];
+                                        const parents = items.filter((item) =>
+                                            item.childIds.includes(id)
+                                        );
+                                        setDeleteParentId(
+                                            parentId && parents.length > 1 ? parentId : null
+                                        );
                                         setSelectedId(id);
                                         setDialog('delete');
                                     }}
@@ -476,7 +486,10 @@ function App() {
                             );
                         }}
                         onSelect={setSelectedId}
-                        onDelete={() => setDialog('delete')}
+                        onDelete={() => {
+                            setDeleteParentId(null);
+                            setDialog('delete');
+                        }}
                         onCreate={(type) => openCreate(type, selected.id)}
                         onRelate={(parentId, childId, add) =>
                             save(
@@ -500,6 +513,7 @@ function App() {
                     key={dialog}
                     kind={dialog}
                     item={selected}
+                    deleteParent={items.find((item) => item.id === deleteParentId)}
                     items={items}
                     labels={labels}
                     initialType={createType}
@@ -530,6 +544,22 @@ function App() {
                     }}
                     onDelete={async () => {
                         if (!selected) return;
+                        if (deleteParentId) {
+                            const saved = await save(
+                                items.map((item) =>
+                                    item.id === deleteParentId
+                                        ? {
+                                              ...item,
+                                              childIds: item.childIds.filter(
+                                                  (id) => id !== selected.id
+                                              )
+                                          }
+                                        : item
+                                )
+                            );
+                            if (saved) setDialog(null);
+                            return;
+                        }
                         if (
                             await save(
                                 items

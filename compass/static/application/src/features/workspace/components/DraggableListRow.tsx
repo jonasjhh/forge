@@ -16,6 +16,7 @@ interface DraggableListRowProps {
     row: ListRow;
     selectedId: string | null;
     busy: boolean;
+    onSelect: (id: string) => void;
     children: (dragHandle: React.ReactNode, dropTargets: React.ReactNode) => React.ReactNode;
 }
 
@@ -39,6 +40,7 @@ export default function DraggableListRow({
     row,
     selectedId,
     busy,
+    onSelect,
     children
 }: DraggableListRowProps) {
     const { entry, path, depth } = row;
@@ -78,6 +80,17 @@ export default function DraggableListRow({
             data-depth={depth}
             data-path={path}
             className={`entry-row entry-row-${entry.type} ${selectedId === entry.id ? 'selected-row' : ''} ${isDragging ? 'is-dragging' : ''}`}
+            onClick={(event) => {
+                if (active || isDragging) return;
+                if (
+                    event.target instanceof Element &&
+                    event.target.closest(
+                        'button, a, input, select, textarea, summary, [role="button"]'
+                    )
+                )
+                    return;
+                onSelect(entry.id);
+            }}
         >
             {children(dragHandle, dropTargets)}
         </tr>

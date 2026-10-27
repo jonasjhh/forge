@@ -662,6 +662,53 @@ test('given root entries, dragging changes their saved list order', () => {
     ]);
 });
 
+test.each([
+    { selector: '[data-path="parent"]', selected: ['parent'], deleted: [] },
+    { selector: '[data-path="parent"] .column-labels', selected: ['parent'], deleted: [] },
+    { selector: '[data-path="parent"] .column-assignees span', selected: ['parent'], deleted: [] },
+    { selector: '[data-path="parent"] .goal-name svg', selected: ['parent'], deleted: [] },
+    { selector: '[data-path="parent"] .branch-toggle svg', selected: [], deleted: [] },
+    { selector: '[data-path="parent"] .drag-handle svg', selected: [], deleted: [] },
+    { selector: '[data-path="parent"] .icon-button svg', selected: [], deleted: ['parent'] },
+    {
+        selector: '[data-path="parent/child"] .table-parent-links button',
+        selected: ['parent'],
+        deleted: []
+    }
+])(
+    'given a row click on $selector, only the intended action runs',
+    ({ selector, selected, deleted }) => {
+        const items = [
+            entryFixture({ id: 'parent', type: 'goal', childIds: ['child'] }),
+            entryFixture({ id: 'child', type: 'goal' })
+        ];
+        const onSelect = jest.fn();
+        const onDelete = jest.fn();
+        act(() => {
+            ReactDOM.render(
+                <GoalList
+                    items={items}
+                    labels={[]}
+                    entries={items}
+                    selectedId={null}
+                    busy={false}
+                    onSelect={onSelect}
+                    onDelete={onDelete}
+                    onRearrange={async () => true}
+                />,
+                container
+            );
+        });
+        act(() => {
+            required(container.querySelector(selector)).dispatchEvent(
+                new MouseEvent('click', { bubbles: true })
+            );
+        });
+        expect(onSelect.mock.calls.flat()).toEqual(selected);
+        expect(onDelete.mock.calls.flat()).toEqual(deleted);
+    }
+);
+
 test('given a table column resizer, arrow keys adjust the adjacent column widths', () => {
     const items = [entryFixture({ id: 'group', type: 'group' })];
     act(() => {
@@ -921,6 +968,76 @@ test('given an unselected row, its trash action confirms deletion and preserves 
     expect(container.querySelector('[aria-label="Delete goal Goal"]')).toBeNull();
     expect(container.querySelector('[aria-label="Delete metric Metric"]')).not.toBeNull();
 });
+
+test.each(['row', 'sidebar'])(
+    'given a shared goal, the %s delete action removes only its intended scope',
+    async (source) => {
+        const sharedGoal = entryFixture({
+            id: 'shared',
+            type: 'goal',
+            name: 'Shared',
+            childIds: ['metric']
+        });
+        const metric = entryFixture({ id: 'metric', type: 'metric', name: 'Metric' });
+        localStorage.setItem(
+            'compass-preview-v1',
+            JSON.stringify({
+                items: [
+                    entryFixture({ id: 'first', type: 'goal', childIds: ['shared'] }),
+                    entryFixture({ id: 'second', type: 'goal', childIds: ['shared'] }),
+                    sharedGoal,
+                    metric
+                ],
+                updatedAt: null
+            })
+        );
+        await act(async () => {
+            ReactDOM.render(<App />, container);
+        });
+        act(() => {
+            if (source === 'row') {
+                Simulate.click(
+                    required(
+                        container.querySelector(
+                            '[data-path="second/shared"] [aria-label="Delete goal Shared"]'
+                        )
+                    )
+                );
+            } else {
+                Simulate.click(
+                    required(container.querySelector('[aria-label="Open goal Shared"]'))
+                );
+            }
+        });
+        if (source === 'sidebar') {
+            act(() => {
+                Simulate.click(
+                    required(container.querySelector('.details [aria-label="Delete goal"]'))
+                );
+            });
+        }
+        expect(container.querySelector('#dialog-title')?.textContent).toBe(
+            source === 'row' ? 'Remove connection?' : 'Delete goal?'
+        );
+        expect(savedGraph().items).toHaveLength(4);
+        await act(async () => {
+            Simulate.submit(required(container.querySelector('dialog form')));
+        });
+        const saved = savedGraph().items;
+        expect(required(saved.find((entry) => entry.id === 'second')).childIds).toEqual([]);
+        expect(required(saved.find((entry) => entry.id === 'first')).childIds).toEqual(
+            source === 'row' ? ['shared'] : []
+        );
+        expect(saved.find((entry) => entry.id === 'shared')).toEqual(
+            source === 'row' ? sharedGoal : undefined
+        );
+        expect(saved.find((entry) => entry.id === 'metric')).toEqual(metric);
+        expect(container.querySelector('[data-path="second/shared"]')).toBeNull();
+        expect(Boolean(container.querySelector('[data-path="first/shared"]'))).toBe(
+            source === 'row'
+        );
+    }
+);
 
 test('given a selected parent, deleting it preserves its child and clears the selection', async () => {
     localStorage.setItem(
