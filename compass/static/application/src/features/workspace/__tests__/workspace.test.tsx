@@ -167,6 +167,41 @@ test.each([0, 1])(
     }
 );
 
+test('given an edit sidebar, its divider resizes with pointer and keyboard within limits', async () => {
+    localStorage.setItem(
+        'compass-preview-v1',
+        JSON.stringify({
+            items: [entryFixture({ id: 'goal', type: 'goal', name: 'Goal' })],
+            updatedAt: null
+        })
+    );
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    expect(container.querySelector('.sidebar-resizer')).toBeNull();
+    act(() => {
+        Simulate.click(required(container.querySelector('[aria-label="Open goal Goal"]')));
+    });
+    const handle = required(container.querySelector<HTMLButtonElement>('.sidebar-resizer'));
+    const workspace = required(container.querySelector<HTMLDivElement>('.workspace'));
+    jest.spyOn(workspace, 'getBoundingClientRect').mockReturnValue({ width: 1200 } as DOMRect);
+    Object.defineProperty(handle, 'setPointerCapture', { value: jest.fn() });
+    act(() => Simulate.keyDown(handle, { key: 'ArrowLeft' }));
+    expect(handle.getAttribute('aria-valuenow')).toBe('340');
+    act(() => Simulate.pointerDown(handle, { button: 0, clientX: 800 }));
+    act(() => Simulate.pointerMove(handle, { clientX: 700 }));
+    expect(workspace.style.getPropertyValue('--sidebar-width')).toBe('440px');
+    act(() => Simulate.pointerMove(handle, { clientX: 0 }));
+    expect(handle.getAttribute('aria-valuenow')).toBe('600');
+    act(() => Simulate.pointerMove(handle, { clientX: 2000 }));
+    expect(handle.getAttribute('aria-valuenow')).toBe('280');
+    act(() => Simulate.pointerUp(handle));
+    act(() => Simulate.pointerMove(handle, { clientX: 0 }));
+    expect(handle.getAttribute('aria-valuenow')).toBe('280');
+    act(() => Simulate.keyDown(handle, { key: 'ArrowRight' }));
+    expect(handle.getAttribute('aria-valuenow')).toBe('280');
+});
+
 test('given a workspace label, it can be created, assigned, filtered, and removed cleanly', async () => {
     localStorage.setItem(
         'compass-preview-v1',

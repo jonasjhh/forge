@@ -4,6 +4,7 @@ import {
     Folder as GroupIcon,
     Compass,
     GitBranch,
+    GripVertical,
     ListTree,
     List,
     LoaderCircle,
@@ -57,6 +58,9 @@ function App() {
     const [items, setItems] = useState<WorkspaceEntry[]>([]);
     const [labels, setLabels] = useState<WorkspaceLabel[]>([]);
     const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [sidebarWidth, setSidebarWidth] = useState(320);
+    const workspaceRef = useRef<HTMLDivElement>(null);
+    const sidebarResize = useRef<{ startX: number; width: number } | null>(null);
     const [search, setSearch] = useState('');
     const [mode, setMode] = useState<ViewMode>('list');
     const [loading, setLoading] = useState(true);
@@ -279,7 +283,77 @@ function App() {
                     </button>
                 </div>
             )}
-            <div className={`workspace ${selected ? 'has-selection' : ''} mode-${mode}`}>
+            <div
+                ref={workspaceRef}
+                className={`workspace ${selected ? 'has-selection' : ''} mode-${mode}`}
+                style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
+            >
+                {selected && (
+                    <button
+                        type="button"
+                        className="sidebar-resizer"
+                        role="separator"
+                        aria-label="Resize edit sidebar"
+                        aria-orientation="vertical"
+                        aria-valuemin={280}
+                        aria-valuemax={640}
+                        aria-valuenow={sidebarWidth}
+                        title="Resize edit sidebar"
+                        onPointerDown={(event) => {
+                            if (event.button !== 0) return;
+                            event.preventDefault();
+                            sidebarResize.current = {
+                                startX: event.clientX,
+                                width: Math.min(
+                                    sidebarWidth,
+                                    (workspaceRef.current?.getBoundingClientRect().width || 1280) /
+                                        2
+                                )
+                            };
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                        }}
+                        onPointerMove={(event) => {
+                            const gesture = sidebarResize.current;
+                            if (!gesture) return;
+                            const maximum = Math.min(
+                                640,
+                                (workspaceRef.current?.getBoundingClientRect().width || 1280) / 2
+                            );
+                            setSidebarWidth(
+                                Math.max(
+                                    280,
+                                    Math.min(
+                                        maximum,
+                                        gesture.width + gesture.startX - event.clientX
+                                    )
+                                )
+                            );
+                        }}
+                        onPointerUp={() => {
+                            sidebarResize.current = null;
+                        }}
+                        onPointerCancel={() => {
+                            sidebarResize.current = null;
+                        }}
+                        onLostPointerCapture={() => {
+                            sidebarResize.current = null;
+                        }}
+                        onKeyDown={(event) => {
+                            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                            event.preventDefault();
+                            const maximum = Math.min(
+                                640,
+                                (workspaceRef.current?.getBoundingClientRect().width || 1280) / 2
+                            );
+                            const amount = event.key === 'ArrowLeft' ? 20 : -20;
+                            setSidebarWidth((current) =>
+                                Math.max(280, Math.min(maximum, current + amount))
+                            );
+                        }}
+                    >
+                        <GripVertical size={16} aria-hidden="true" />
+                    </button>
+                )}
                 <section className="graph-workspace" aria-label="Goals workspace">
                     <div className="graph-toolbar">
                         <div className="view-switch" role="group" aria-label="Layout">
