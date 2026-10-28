@@ -163,6 +163,39 @@ test('given a goal category, creating and changing it updates the list label and
     expect(typeFilter.querySelector('input[value="Delivery"]')).not.toBeNull();
 });
 
+test('given an open edit sidebar, closing it clears selection and allows reopening', async () => {
+    localStorage.setItem(
+        'compass-preview-v1',
+        JSON.stringify({
+            items: [entryFixture({ id: 'goal', type: 'goal', name: 'Original goal' })],
+            updatedAt: null
+        })
+    );
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    act(() => {
+        Simulate.click(required(container.querySelector('[aria-label="Open goal Original goal"]')));
+    });
+    const closeButton = required(
+        container.querySelector<HTMLButtonElement>('.details [aria-label="Close sidebar"]')
+    );
+    expect(closeButton.title).toBe('Close sidebar');
+    act(() => Simulate.click(closeButton));
+    expect(container.querySelector('.details')).toBeNull();
+    expect(container.querySelector('.workspace.has-selection')).toBeNull();
+    expect(
+        container
+            .querySelector('[aria-label="Open goal Original goal"]')
+            ?.getAttribute('aria-pressed')
+    ).toBe('false');
+    act(() => {
+        Simulate.click(required(container.querySelector('[aria-label="Open goal Original goal"]')));
+    });
+    expect(container.querySelector('.details')).not.toBeNull();
+    expect(savedGraph().items[0].name).toBe('Original goal');
+});
+
 test.each([0, 1])(
     'given sidebar save button %s, it saves the same edit form',
     async (buttonIndex) => {
@@ -573,6 +606,48 @@ test('given a workspace label, it can be created, assigned, filtered, and remove
     });
     expect(savedGraph().labels).toEqual([]);
     expect(required(savedGraph().items.find((entry) => entry.id === 'goal')).labelIds).toEqual([]);
+});
+
+test('given many long labels, the list shows two chips and an overflow count without changing assignments', async () => {
+    const labels = Array.from({ length: 5 }, (_, index) => ({
+        id: `label-${index}`,
+        name: `Long label ${index} with a detailed description`,
+        color: '#0c66e4'
+    }));
+    const goal = entryFixture({
+        id: 'goal',
+        type: 'goal',
+        name: 'Labelled goal',
+        labelIds: labels.map((label) => label.id)
+    });
+    localStorage.setItem(
+        'compass-preview-v1',
+        JSON.stringify({ items: [goal], labels, updatedAt: null })
+    );
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    const chips = container.querySelectorAll<HTMLElement>('.table-labels .workspace-label-chip');
+    expect([...chips].map((chip) => chip.textContent)).toEqual(
+        labels.slice(0, 2).map((label) => label.name)
+    );
+    expect(chips[0].title).toBe(labels[0].name);
+    const overflow = required(container.querySelector<HTMLElement>('.table-label-overflow'));
+    expect(overflow.textContent).toBe('+3');
+    expect(overflow.title).toBe(
+        labels
+            .slice(2)
+            .map((label) => label.name)
+            .join('\n')
+    );
+    expect(overflow.tabIndex).toBe(0);
+    expect(overflow.getAttribute('aria-label')).toContain(labels[4].name);
+    expect(savedGraph().items[0].labelIds).toEqual(goal.labelIds);
+    act(() => {
+        Simulate.click(required(container.querySelector('[aria-label="Open goal Labelled goal"]')));
+    });
+    expect(container.querySelector('.details')).not.toBeNull();
+    expect(savedGraph().items[0].labelIds).toHaveLength(5);
 });
 
 test('given an item editor, only existing labels can be assigned', async () => {
@@ -1375,6 +1450,8 @@ interface NetworkMock {
     stopSimulation: jest.Mock;
     setOptions: jest.Mock;
     fit: jest.Mock;
+    getScale: jest.Mock;
+    moveTo: jest.Mock;
 }
 const mockNetwork = Network as unknown as jest.Mock<
     NetworkMock,
@@ -1494,6 +1571,8 @@ beforeEach(() => {
             stopSimulation: jest.fn(),
             setOptions: jest.fn(),
             fit: jest.fn(),
+            getScale: jest.fn(() => 1),
+            moveTo: jest.fn(),
             selectNodes: jest.fn((selectedIds: string[]) => {
                 if (selectedIds.some((id) => !data.nodes.get(id))) {
                     throw new Error('Selected node is missing from the graph.');
@@ -1950,6 +2029,58 @@ test('given a selected list row, only its connected items remain and graph inher
     expect(container.querySelector('[data-entry-id="other"]')).not.toBeNull();
     expect(savedGraph().items).toEqual(items);
 });
+
+test.each(['Graph', 'Tree'])(
+    'given %s navigation, zoom uses smaller steps and keyboard control stays within the graph',
+    async (view) => {
+        localStorage.setItem(
+            'compass-preview-v1',
+            JSON.stringify({
+                items: [entryFixture({ id: 'goal', type: 'goal' })],
+                labels: [],
+                updatedAt: null
+            })
+        );
+        await act(async () => {
+            ReactDOM.render(<App />, container);
+        });
+        act(() => {
+            Simulate.click(
+                required(
+                    [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].find(
+                        (button) => button.textContent?.trim() === view
+                    )
+                )
+            );
+        });
+        expect(mockNetwork.mock.calls[0][2]).toMatchObject({
+            interaction: {
+                zoomSpeed: 0.25,
+                keyboard: {
+                    enabled: true,
+                    bindToWindow: false,
+                    speed: { x: 5, y: 5, zoom: 0.02 }
+                }
+            }
+        });
+        expect(container.querySelector('.network-canvas')?.hasAttribute('tabindex')).toBe(false);
+        const instance = mockNetwork.mock.results[0].value;
+        act(() => Simulate.click(required(container.querySelector('[aria-label="Zoom in"]'))));
+        expect(instance.moveTo).toHaveBeenLastCalledWith({
+            scale: 1.1,
+            animation: { duration: 180, easingFunction: 'easeInOutQuad' }
+        });
+        act(() => Simulate.click(required(container.querySelector('[aria-label="Zoom out"]'))));
+        expect(instance.moveTo).toHaveBeenLastCalledWith({
+            scale: 1 / 1.1,
+            animation: { duration: 180, easingFunction: 'easeInOutQuad' }
+        });
+        act(() => Simulate.click(required(container.querySelector('[aria-label="Fit graph"]'))));
+        expect(instance.fit).toHaveBeenLastCalledWith({
+            animation: { duration: 300, easingFunction: 'easeInOutQuad' }
+        });
+    }
+);
 
 test('given changed callbacks and selection, the graph keeps its network and invokes the current callback', () => {
     const items = [entryFixture({ id: 'goal', type: 'goal' })];

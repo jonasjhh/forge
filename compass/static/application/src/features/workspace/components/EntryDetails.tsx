@@ -38,6 +38,7 @@ interface EntryDetailsProps {
     busy: boolean;
     onSave: (entry: WorkspaceEntry, groupId?: string) => Promise<boolean>;
     onSelect: (id: string) => void;
+    onClose: () => void;
     onDelete: () => void;
     onCreate: (type: EntryType) => void;
     onRelate: (parentId: string, childId: string, add: boolean) => Promise<boolean>;
@@ -49,6 +50,7 @@ export default function EntryDetails({
     busy,
     onSave: saveEntry,
     onSelect,
+    onClose,
     onDelete,
     onCreate,
     onRelate
@@ -134,13 +136,18 @@ export default function EntryDetails({
                     {item.type === 'goal' && <GoalCategoryIcon size={14} aria-hidden="true" />}
                     {typeLabel}
                 </span>
-                <IconButton
-                    label={`Delete ${entryTypes[item.type].label.toLowerCase()}`}
-                    disabled={busy}
-                    onClick={onDelete}
-                >
-                    <Trash2 size={17} />
-                </IconButton>
+                <div className="row-actions">
+                    <IconButton
+                        label={`Delete ${entryTypes[item.type].label.toLowerCase()}`}
+                        disabled={busy}
+                        onClick={onDelete}
+                    >
+                        <Trash2 size={17} />
+                    </IconButton>
+                    <IconButton label="Close sidebar" onClick={onClose}>
+                        <X size={17} />
+                    </IconButton>
+                </div>
             </div>
             <div className="details-save-actions">{saveButton}</div>
             <form

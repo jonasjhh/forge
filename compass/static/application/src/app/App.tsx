@@ -548,13 +548,13 @@ function App() {
                                     <div className="graph-controls">
                                         <IconButton
                                             label="Zoom in"
-                                            onClick={() => graph.current?.zoom(1.2)}
+                                            onClick={() => graph.current?.zoom(1.1)}
                                         >
                                             <ZoomIn size={18} />
                                         </IconButton>
                                         <IconButton
                                             label="Zoom out"
-                                            onClick={() => graph.current?.zoom(1 / 1.2)}
+                                            onClick={() => graph.current?.zoom(1 / 1.1)}
                                         >
                                             <ZoomOut size={18} />
                                         </IconButton>
@@ -600,6 +600,7 @@ function App() {
                             );
                         }}
                         onSelect={setSelectedId}
+                        onClose={() => setSelectedId(null)}
                         onDelete={() => {
                             setDeleteParentId(null);
                             setDialog('delete');

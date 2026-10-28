@@ -38,12 +38,16 @@ const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
     useImperativeHandle(
         ref,
         () => ({
-            fit: () => network.current && network.current.fit({ animation: true }),
+            fit: () =>
+                network.current &&
+                network.current.fit({
+                    animation: { duration: 300, easingFunction: 'easeInOutQuad' }
+                }),
             zoom: (factor) => {
                 if (network.current) {
                     network.current.moveTo({
                         scale: Math.max(0.15, Math.min(3, network.current.getScale() * factor)),
-                        animation: true
+                        animation: { duration: 180, easingFunction: 'easeInOutQuad' }
                     });
                 }
             }
@@ -191,7 +195,16 @@ const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
                 smooth: mode !== 'tree',
                 width: 1.5
             },
-            interaction: { hover: true, hideEdgesOnDrag: false, keyboard: false },
+            interaction: {
+                hover: true,
+                hideEdgesOnDrag: false,
+                zoomSpeed: 0.25,
+                keyboard: {
+                    enabled: true,
+                    bindToWindow: false,
+                    speed: { x: 5, y: 5, zoom: 0.02 }
+                }
+            },
             height: '100%',
             width: '100%'
         });

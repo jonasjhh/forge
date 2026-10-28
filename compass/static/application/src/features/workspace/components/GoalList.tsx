@@ -320,6 +320,9 @@ export default function GoalList({
                     </thead>
                     <tbody>
                         {rows.map(({ entry, depth, path, hasChildren }) => {
+                            const assignedLabels = (entry.labelIds ?? [])
+                                .map((id) => labels.find((label) => label.id === id))
+                                .filter((label): label is WorkspaceLabel => Boolean(label));
                             const parents = items.filter(
                                 (candidate) =>
                                     candidate.type === 'goal' &&
@@ -459,17 +462,25 @@ export default function GoalList({
                                             </td>
                                             <td className="column-labels">
                                                 <div className="table-labels">
-                                                    {(entry.labelIds ?? []).map((id) => {
-                                                        const label = labels.find(
-                                                            (candidate) => candidate.id === id
-                                                        );
-                                                        return label ? (
-                                                            <LabelChip
-                                                                key={label.id}
-                                                                label={label}
-                                                            />
-                                                        ) : null;
-                                                    })}
+                                                    {assignedLabels.slice(0, 2).map((label) => (
+                                                        <LabelChip key={label.id} label={label} />
+                                                    ))}
+                                                    {assignedLabels.length > 2 && (
+                                                        <span
+                                                            className="table-label-overflow"
+                                                            tabIndex={0}
+                                                            title={assignedLabels
+                                                                .slice(2)
+                                                                .map((label) => label.name)
+                                                                .join('\n')}
+                                                            aria-label={`${assignedLabels.length - 2} more labels: ${assignedLabels
+                                                                .slice(2)
+                                                                .map((label) => label.name)
+                                                                .join(', ')}`}
+                                                        >
+                                                            +{assignedLabels.length - 2}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="column-parents">
