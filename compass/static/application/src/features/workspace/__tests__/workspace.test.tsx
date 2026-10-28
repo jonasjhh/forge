@@ -1439,8 +1439,15 @@ interface GraphMockData {
         title: string;
         color: { background: string; border: string };
         hidden?: boolean;
+        opacity?: number;
     }>;
-    edges: Array<{ id?: string; from: string; to: string; hidden?: boolean }>;
+    edges: Array<{
+        id?: string;
+        from: string;
+        to: string;
+        hidden?: boolean;
+        color?: { opacity?: number };
+    }>;
 }
 interface NetworkMock {
     on: jest.Mock;
@@ -1452,6 +1459,7 @@ interface NetworkMock {
     fit: jest.Mock;
     getScale: jest.Mock;
     moveTo: jest.Mock;
+    DOMtoCanvas: jest.Mock;
 }
 const mockNetwork = Network as unknown as jest.Mock<
     NetworkMock,
@@ -1479,10 +1487,10 @@ const mockNetwork = Network as unknown as jest.Mock<
 function graphSnapshot(index = mockNetwork.mock.calls.length - 1): GraphMockData {
     const data = mockNetwork.mock.calls[index][1];
     return {
-        nodes: data.nodes.get().filter((node) => !node.hidden),
+        nodes: data.nodes.get().filter((node) => !node.hidden && node.opacity !== 0.15),
         edges: data.edges
             .get()
-            .filter((edge) => !edge.hidden)
+            .filter((edge) => !edge.hidden && edge.color?.opacity !== 0.1)
             .map(({ from, to }) => ({ from, to }))
     };
 }
@@ -1573,6 +1581,7 @@ beforeEach(() => {
             fit: jest.fn(),
             getScale: jest.fn(() => 1),
             moveTo: jest.fn(),
+            DOMtoCanvas: jest.fn(() => ({ x: 20, y: 30 })),
             selectNodes: jest.fn((selectedIds: string[]) => {
                 if (selectedIds.some((id) => !data.nodes.get(id))) {
                     throw new Error('Selected node is missing from the graph.');
@@ -1853,7 +1862,7 @@ test('given a goal, creating an assigned metric saves its values and parent conn
     ]);
 });
 
-test('given shared goals, tree focus follows every indirect connection but ignores group membership', () => {
+test('given shared goals, focus follows ancestors and descendants without including neighboring branches', () => {
     const items = [
         entryFixture({ id: 'group', childIds: ['first', 'unrelated'] }),
         entryFixture({ id: 'first', type: 'goal', childIds: ['shared', 'sibling'] }),
@@ -1867,13 +1876,91 @@ test('given shared goals, tree focus follows every indirect connection but ignor
         'first',
         'second',
         'shared',
+        'metric'
+    ]);
+    expect(connectedEntries(items, 'first').map((entry) => entry.id)).toEqual([
+        'first',
+        'shared',
         'metric',
         'sibling'
+    ]);
+    expect(connectedEntries(items, 'shared').map((entry) => entry.id)).toEqual([
+        'first',
+        'second',
+        'shared',
+        'metric'
     ]);
     expect(connectedEntries(items, 'unrelated').map((entry) => entry.id)).toEqual(['unrelated']);
     expect(connectedEntries(items, 'missing')).toEqual(items);
     expect(connectedEntries(items, 'group')).toEqual(items);
 });
+
+test.each(['Tree', 'Graph'])(
+    'given shared dependencies in %s, focusing a goal dims other branches in the existing dataset',
+    async (view) => {
+        const items = [
+            entryFixture({ id: 'first', type: 'goal', childIds: ['child', 'shared'] }),
+            entryFixture({ id: 'child', type: 'goal', childIds: ['metric'] }),
+            entryFixture({ id: 'metric', type: 'metric' }),
+            entryFixture({ id: 'shared', type: 'goal' }),
+            entryFixture({ id: 'other', type: 'goal', childIds: ['shared', 'other-child'] }),
+            entryFixture({ id: 'other-child', type: 'goal' })
+        ];
+        localStorage.setItem(
+            'compass-preview-v1',
+            JSON.stringify({ items, labels: [], updatedAt: null })
+        );
+        await act(async () => {
+            ReactDOM.render(<App />, container);
+        });
+        act(() => {
+            Simulate.click(
+                required(
+                    [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].find(
+                        (button) => button.textContent?.trim() === view
+                    )
+                )
+            );
+        });
+        const instance: NetworkMock = mockNetwork.mock.results[0].value;
+        const data = mockNetwork.mock.calls[0][1];
+        const removeNodes = jest.spyOn(data.nodes, 'remove');
+        const removeEdges = jest.spyOn(data.edges, 'remove');
+        const select = required(
+            instance.on.mock.calls.find(([eventName]) => eventName === 'selectNode')
+        )[1];
+        act(() => select({ nodes: ['first'] }));
+        expect(graphSnapshot().nodes.map((node) => node.id)).toEqual([
+            'first',
+            'child',
+            'metric',
+            'shared'
+        ]);
+        expect(graphSnapshot().edges).toEqual([
+            { from: 'first', to: 'child' },
+            { from: 'first', to: 'shared' },
+            { from: 'child', to: 'metric' }
+        ]);
+        expect(data.nodes.get('other')).toMatchObject({ hidden: false, opacity: 0.15 });
+        expect(data.edges.get('other:shared')).toMatchObject({
+            hidden: false,
+            color: { opacity: 0.1 }
+        });
+        expect(data.nodes.length).toBe(6);
+        expect(removeNodes).not.toHaveBeenCalled();
+        expect(removeEdges).not.toHaveBeenCalled();
+        expect(instance.fit).not.toHaveBeenCalled();
+        expect(instance.moveTo).not.toHaveBeenCalled();
+        expect(instance.destroy).not.toHaveBeenCalled();
+        expect(mockNetwork).toHaveBeenCalledTimes(1);
+        act(() => {
+            Simulate.click(required(container.querySelector('[aria-label="Close sidebar"]')));
+        });
+        expect(graphSnapshot().nodes).toHaveLength(6);
+        expect(mockNetwork).toHaveBeenCalledTimes(1);
+        expect(savedGraph().items).toEqual(items);
+    }
+);
 
 test.each(['Tree', 'Graph'])(
     'given a clicked %s node, focus updates visibility without rebuilding the network',
@@ -2079,6 +2166,42 @@ test.each(['Graph', 'Tree'])(
         expect(instance.fit).toHaveBeenLastCalledWith({
             animation: { duration: 300, easingFunction: 'easeInOutQuad' }
         });
+    }
+);
+
+test.each(['graph', 'tree'] as const)(
+    'given %s canvas resizing, the existing zoom and view center are restored',
+    (mode) => {
+        const schedule = jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(123);
+        act(() => {
+            ReactDOM.render(
+                <ItemGraph
+                    items={[entryFixture({ id: 'goal', type: 'goal' })]}
+                    labels={[]}
+                    selectedId={null}
+                    mode={mode}
+                    onSelect={() => {}}
+                />,
+                container
+            );
+        });
+        const instance: NetworkMock = mockNetwork.mock.results[0].value;
+        act(() => {
+            required(instance.on.mock.calls.find(([eventName]) => eventName === 'resize'))[1]({
+                oldWidth: 1000,
+                oldHeight: 600
+            });
+        });
+        expect(instance.DOMtoCanvas).toHaveBeenCalledWith({ x: 500, y: 300 });
+        expect(instance.moveTo).not.toHaveBeenCalled();
+        act(() => schedule.mock.calls[0][0](0));
+        expect(instance.moveTo).toHaveBeenCalledWith({
+            scale: 1,
+            position: { x: 20, y: 30 },
+            animation: false
+        });
+        expect(mockNetwork).toHaveBeenCalledTimes(1);
+        expect(instance.destroy).not.toHaveBeenCalled();
     }
 );
 

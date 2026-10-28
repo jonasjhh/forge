@@ -17,6 +17,7 @@ interface ItemGraphProps {
     onSelect: (id: string) => void;
     onClearSelection?: () => void;
     visibleIds?: string[];
+    focusedIds?: string[];
 }
 
 function labelText(text: string): string {
@@ -24,7 +25,7 @@ function labelText(text: string): string {
 }
 
 const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
-    { items, labels, selectedId, mode, onSelect, onClearSelection, visibleIds },
+    { items, labels, selectedId, mode, onSelect, onClearSelection, visibleIds, focusedIds },
     ref
 ) {
     const container = useRef<HTMLDivElement>(null);
@@ -105,6 +106,7 @@ const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
                 label: `<b>${label}</b>\n${labelText(item.name)}${metric}${labelLine}`,
                 title,
                 hidden: data.nodes.get(item.id)?.hidden ?? false,
+                opacity: data.nodes.get(item.id)?.opacity ?? 1,
                 color: { background: info.color, border: info.border }
             };
         });
@@ -115,12 +117,15 @@ const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
                     id: `${item.id}:${childId}`,
                     from: item.id,
                     to: childId,
-                    hidden: data.edges.get(`${item.id}:${childId}`)?.hidden ?? false
+                    hidden: data.edges.get(`${item.id}:${childId}`)?.hidden ?? false,
+                    color: data.edges.get(`${item.id}:${childId}`)?.color ?? { opacity: 1 }
                 }))
         );
         const edgeIds = new Set(nextEdges.map((edge) => edge.id));
-        data.edges.remove(data.edges.getIds().filter((id) => !edgeIds.has(id)));
-        data.nodes.remove(data.nodes.getIds().filter((id) => !entryIds.has(String(id))));
+        const removedEdgeIds = data.edges.getIds().filter((id) => !edgeIds.has(id));
+        const removedNodeIds = data.nodes.getIds().filter((id) => !entryIds.has(String(id)));
+        if (removedEdgeIds.length) data.edges.remove(removedEdgeIds);
+        if (removedNodeIds.length) data.nodes.remove(removedNodeIds);
         const changedNodes = nextNodes.filter(
             (node) => JSON.stringify(data.nodes.get(node.id!)) !== JSON.stringify(node)
         );
@@ -209,6 +214,19 @@ const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
             width: '100%'
         });
         network.current = instance;
+        let resizeFrame: number | undefined;
+        instance.on(
+            'resize',
+            ({ oldWidth, oldHeight }: { oldWidth: number; oldHeight: number }) => {
+                if (!oldWidth || !oldHeight) return;
+                const scale = instance.getScale();
+                const position = instance.DOMtoCanvas({ x: oldWidth / 2, y: oldHeight / 2 });
+                if (resizeFrame !== undefined) cancelAnimationFrame(resizeFrame);
+                resizeFrame = requestAnimationFrame(() => {
+                    instance.moveTo({ scale, position, animation: false });
+                });
+            }
+        );
         instance.on('selectNode', ({ nodes }: { nodes: Array<string | number> }) => {
             if (nodes.length) {
                 instance.stopSimulation();
@@ -224,6 +242,7 @@ const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
             instance.setOptions({ physics: { enabled: false } });
         });
         return () => {
+            if (resizeFrame !== undefined) cancelAnimationFrame(resizeFrame);
             network.current = null;
             instance.destroy();
         };
@@ -233,24 +252,38 @@ const ItemGraph = forwardRef<GraphHandle, ItemGraphProps>(function ItemGraph(
         const shownIds = new Set(
             visibleIds ?? items.filter((item) => item.type !== 'group').map((item) => item.id)
         );
+        const focus = focusedIds ? new Set(focusedIds) : null;
         const changedNodes = data.nodes
             .get()
-            .filter((node) => Boolean(node.hidden) !== !shownIds.has(String(node.id)))
-            .map((node) => ({ id: node.id!, hidden: !shownIds.has(String(node.id)) }));
+            .map((node) => ({
+                id: node.id!,
+                hidden: !shownIds.has(String(node.id)),
+                opacity: !focus || focus.has(String(node.id)) ? 1 : 0.15
+            }))
+            .filter((node) => {
+                const current = data.nodes.get(node.id)!;
+                return Boolean(current.hidden) !== node.hidden || current.opacity !== node.opacity;
+            });
         const changedEdges = data.edges
             .get()
-            .filter(
-                (edge) =>
-                    Boolean(edge.hidden) !==
-                    !(shownIds.has(String(edge.from)) && shownIds.has(String(edge.to)))
-            )
             .map((edge) => ({
                 id: edge.id!,
-                hidden: !(shownIds.has(String(edge.from)) && shownIds.has(String(edge.to)))
-            }));
+                hidden: !(shownIds.has(String(edge.from)) && shownIds.has(String(edge.to))),
+                color: {
+                    opacity:
+                        !focus || (focus.has(String(edge.from)) && focus.has(String(edge.to)))
+                            ? 1
+                            : 0.1
+                }
+            }))
+            .filter((edge) => {
+                const current = data.edges.get(edge.id)!;
+                const opacity = typeof current.color === 'object' ? current.color.opacity : 1;
+                return Boolean(current.hidden) !== edge.hidden || opacity !== edge.color.opacity;
+            });
         if (changedNodes.length) data.nodes.update(changedNodes);
         if (changedEdges.length) data.edges.update(changedEdges);
-    }, [visibleIds, items, selectedId, data, mode]);
+    }, [visibleIds, focusedIds, items, selectedId, data, mode]);
 
     useEffect(() => {
         const selectionExists = items.some(

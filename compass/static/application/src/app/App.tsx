@@ -517,7 +517,12 @@ function App() {
                                     <ItemGraph
                                         ref={graph}
                                         items={contextualItems}
-                                        visibleIds={graphItems.map((item) => item.id)}
+                                        visibleIds={contextualItems.map((item) => item.id)}
+                                        focusedIds={
+                                            selectedId
+                                                ? graphItems.map((item) => item.id)
+                                                : undefined
+                                        }
                                         labels={labels}
                                         selectedId={selectedId}
                                         mode={mode}

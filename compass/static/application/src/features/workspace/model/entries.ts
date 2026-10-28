@@ -171,28 +171,33 @@ export function includeAncestors(
 }
 
 export function connectedEntries(items: WorkspaceEntry[], selectedId: string): WorkspaceEntry[] {
-    const neighbors = new Map(
+    const children = new Map(
         items
             .filter((entry) => entry.type !== 'group')
             .map((entry) => [entry.id, new Set<string>()])
     );
-    if (!neighbors.has(selectedId)) return items;
+    if (!children.has(selectedId)) return items;
+    const parents = new Map([...children.keys()].map((id) => [id, new Set<string>()]));
     items.forEach((entry) => {
-        if (!neighbors.has(entry.id)) return;
+        if (!children.has(entry.id)) return;
         entry.childIds.forEach((childId) => {
-            if (!neighbors.has(childId)) return;
-            neighbors.get(entry.id)!.add(childId);
-            neighbors.get(childId)!.add(entry.id);
+            if (!children.has(childId)) return;
+            children.get(entry.id)!.add(childId);
+            parents.get(childId)!.add(entry.id);
         });
     });
     const connected = new Set([selectedId]);
-    const pending = [selectedId];
-    while (pending.length) {
-        neighbors.get(pending.pop()!)!.forEach((neighborId) => {
-            if (connected.has(neighborId)) return;
-            connected.add(neighborId);
-            pending.push(neighborId);
-        });
+    for (const direction of [parents, children]) {
+        const visited = new Set([selectedId]);
+        const pending = [selectedId];
+        while (pending.length) {
+            direction.get(pending.pop()!)!.forEach((neighborId) => {
+                if (visited.has(neighborId)) return;
+                visited.add(neighborId);
+                connected.add(neighborId);
+                pending.push(neighborId);
+            });
+        }
     }
     return items.filter((entry) => connected.has(entry.id));
 }
