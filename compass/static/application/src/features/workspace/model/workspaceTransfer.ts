@@ -48,7 +48,7 @@ function validateEntry(value: unknown): asserts value is WorkspaceEntry {
         'Entries must be groups, goals, or metrics.'
     );
     requireValid(
-        validIds(value.childIds, 100) && validIds(value.labelIds, 20),
+        validIds(value.childIds, 300) && validIds(value.labelIds, 20),
         'Entry connections and labels must contain unique IDs.'
     );
     requireValid(
@@ -127,8 +127,8 @@ export function parseWorkspaceFile(text: string): Graph {
         'The file must contain items and labels arrays.'
     );
     requireValid(
-        value.items.length <= 100 && value.labels.length <= 100,
-        'A workspace supports up to 100 entries and 100 labels.'
+        value.items.length <= 500 && value.labels.length <= 100,
+        'A workspace supports up to 500 entries and 100 labels.'
     );
     const items = value.items.map((entry: unknown) => {
         validateEntry(entry);

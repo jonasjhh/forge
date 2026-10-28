@@ -103,13 +103,35 @@ test('given incompatible child types, importing is rejected', () => {
     ).toThrow(/incompatible/);
 });
 
-test('given more than 100 entries, importing is rejected', () => {
-    const items = Array.from({ length: 101 }, (_, index) => ({
+test('given 500 entries, importing preserves all entries', () => {
+    const items = Array.from({ length: 500 }, (_, index) => ({
         ...graph.items[0],
         id: `goal-${index}`,
         childIds: []
     }));
-    expect(() => parseWorkspaceFile(JSON.stringify({ items, labels: [] }))).toThrow(/100/);
+    expect(parseWorkspaceFile(JSON.stringify({ items, labels: [] })).items).toEqual(items);
+});
+
+test('given more than 500 entries, importing is rejected', () => {
+    const items = Array.from({ length: 501 }, (_, index) => ({
+        ...graph.items[0],
+        id: `goal-${index}`,
+        childIds: []
+    }));
+    expect(() => parseWorkspaceFile(JSON.stringify({ items, labels: [] }))).toThrow(/500/);
+});
+
+test('given more than 100 children within the connection limit, importing preserves connections', () => {
+    const children = Array.from({ length: 101 }, (_, index) => ({
+        ...graph.items[0],
+        id: `goal-${index}`,
+        childIds: []
+    }));
+    const items = [
+        { ...graph.items[0], childIds: children.map((entry) => entry.id) },
+        ...children
+    ];
+    expect(parseWorkspaceFile(JSON.stringify({ items, labels: [] })).items).toEqual(items);
 });
 
 test('given valid fields exceeding the storage limit in total, importing is rejected', () => {

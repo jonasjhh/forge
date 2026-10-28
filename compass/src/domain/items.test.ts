@@ -95,18 +95,23 @@ test('given an oversized description, the graph is rejected', () => {
     );
 });
 
+test('given 500 items, the graph is accepted', () => {
+    const items = Array.from({ length: 500 }, (_, index) => item(`item-${index}`));
+    assert.equal(validateGraph({ items }).items.length, 500);
+});
+
 test('given too many items, the graph is rejected', () => {
     assert.throws(
         () =>
             validateGraph({
-                items: Array.from({ length: 101 }, (_, index) => item(`item-${index}`))
+                items: Array.from({ length: 501 }, (_, index) => item(`item-${index}`))
             }),
-        /100 items/
+        /500 items/
     );
 });
 
 test('given malformed input, the graph is rejected', () => {
-    assert.throws(() => validateGraph(null), /100 items/);
+    assert.throws(() => validateGraph(null), /500 items/);
     assert.throws(() => validateGraph({ items: [null] }), /valid ID/);
 });
 

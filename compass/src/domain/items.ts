@@ -13,8 +13,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function validateGraph(payload: unknown): Graph {
-    if (!isRecord(payload) || !Array.isArray(payload.items) || payload.items.length > 100) {
-        throw new Error('A workspace can contain up to 100 items.');
+    if (!isRecord(payload) || !Array.isArray(payload.items) || payload.items.length > 500) {
+        throw new Error('A workspace can contain up to 500 items.');
     }
 
     const labels = validateLabels(payload.labels ?? []);
