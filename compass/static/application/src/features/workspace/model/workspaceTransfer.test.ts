@@ -127,10 +127,7 @@ test('given more than 100 children within the connection limit, importing preser
         id: `goal-${index}`,
         childIds: []
     }));
-    const items = [
-        { ...graph.items[0], childIds: children.map((entry) => entry.id) },
-        ...children
-    ];
+    const items = [{ ...graph.items[0], childIds: children.map((entry) => entry.id) }, ...children];
     expect(parseWorkspaceFile(JSON.stringify({ items, labels: [] })).items).toEqual(items);
 });
 
