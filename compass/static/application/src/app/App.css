@@ -300,10 +300,17 @@
 .column-resizer:focus-visible svg {
     opacity: 1;
 }
+.goal-table .column-parents,
 .goal-table .column-metrics {
     text-align: center;
-    padding-left: 5px;
-    padding-right: 5px;
+    padding-left: 3px;
+    padding-right: 3px;
+}
+.column-heading-icon {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    cursor: help;
 }
 .goal-table tbody tr:hover {
     background: #f7f8f9;
@@ -329,7 +336,7 @@
     min-width: 0;
 }
 .goal-name-text {
-    display: block;
+    display: inline;
     font-size: 13px;
     font-weight: 600;
     line-height: 1.5;
@@ -338,12 +345,11 @@
     color: #0055cc;
     text-decoration: underline;
 }
-.goal-row-meta {
-    display: block;
+.metric-progress {
     font-size: 11px;
     font-weight: 400;
     line-height: 1.5;
-    margin-top: 4px;
+    margin-left: 8px;
     color: var(--muted);
 }
 .table-assignees {

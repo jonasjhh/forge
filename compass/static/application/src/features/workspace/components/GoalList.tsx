@@ -41,11 +41,11 @@ const columns = [
     { label: 'Name', className: 'column-name' },
     { label: 'Assignees', className: 'column-assignees' },
     { label: 'Labels', className: 'column-labels' },
-    { label: 'Parent goals', className: 'column-parents' },
-    { label: 'Metrics', className: 'column-metrics' }
+    { label: 'Parent goals', className: 'column-parents', icon: GitBranch },
+    { label: 'Metrics', className: 'column-metrics', icon: Gauge }
 ];
-const minimumColumnWidths = [24, 12, 12, 12, 8];
-const initialColumnWidths = [40, 19, 19, 14, 8];
+const minimumColumnWidths = [24, 12, 12, 5, 5];
+const initialColumnWidths = [48, 21, 21, 5, 5];
 
 function resizeColumnPair(widths: number[], index: number, amount: number): number[] {
     const pairWidth = widths[index] + widths[index + 1];
@@ -281,7 +281,18 @@ export default function GoalList({
                         <tr>
                             {columns.map((column, index) => (
                                 <th key={column.className} scope="col" className={column.className}>
-                                    {column.label}
+                                    {column.icon ? (
+                                        <span
+                                            className="column-heading-icon"
+                                            role="img"
+                                            aria-label={column.label}
+                                            title={column.label}
+                                        >
+                                            <column.icon size={16} aria-hidden="true" />
+                                        </span>
+                                    ) : (
+                                        column.label
+                                    )}
                                     {index < columns.length - 1 && (
                                         <button
                                             type="button"
@@ -427,17 +438,24 @@ export default function GoalList({
                                                         <EntryIcon
                                                             size={17}
                                                             className={iconClass}
-                                                        />
+                                                            role="img"
+                                                            aria-label={label}
+                                                        >
+                                                            <title>{label}</title>
+                                                        </EntryIcon>
                                                         <span>
                                                             <span className="goal-name-text">
                                                                 {entry.name}
                                                             </span>
-                                                            <span className="goal-row-meta">
-                                                                {label}
-                                                                {entry.type === 'metric'
-                                                                    ? ` - ${entry.currentValue ?? 'Not set'} / ${entry.targetValue ?? 'Not set'} ${entry.unit || ''}`
-                                                                    : ''}
-                                                            </span>
+                                                            {entry.type === 'metric' && (
+                                                                <span className="metric-progress">
+                                                                    {entry.currentValue ??
+                                                                        'Not set'}{' '}
+                                                                    /{' '}
+                                                                    {entry.targetValue ?? 'Not set'}{' '}
+                                                                    {entry.unit || ''}
+                                                                </span>
+                                                            )}
                                                         </span>
                                                     </button>
                                                 </div>

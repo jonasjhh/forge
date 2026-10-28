@@ -217,7 +217,10 @@ test('given a goal category, creating and changing it updates the list label and
     const created = required(savedGraph().items.find((item) => item.id === 'created-entry'));
     expect(created.goalCategory).toBe('Capability');
     const createdRow = required(container.querySelector('[data-entry-id="created-entry"]'));
-    expect(createdRow.querySelector('.goal-row-meta')?.textContent).toBe('Capability');
+    expect(createdRow.querySelector('.goal-row-meta')).toBeNull();
+    expect(createdRow.querySelector('.entry-icon-capability')?.getAttribute('aria-label')).toBe(
+        'Capability'
+    );
     expect(createdRow.querySelector('.entry-icon-capability')).not.toBeNull();
 
     act(() => {
@@ -233,7 +236,10 @@ test('given a goal category, creating and changing it updates the list label and
     const updated = required(savedGraph().items.find((item) => item.id === 'created-entry'));
     expect(updated.goalCategory).toBe('Decision');
     const updatedRow = required(container.querySelector('[data-entry-id="created-entry"]'));
-    expect(updatedRow.querySelector('.goal-row-meta')?.textContent).toBe('Decision');
+    expect(updatedRow.querySelector('.goal-row-meta')).toBeNull();
+    expect(updatedRow.querySelector('.entry-icon-decision')?.getAttribute('aria-label')).toBe(
+        'Decision'
+    );
     expect(updatedRow.querySelector('.entry-icon-decision')).not.toBeNull();
 
     const typeFilter = required(
@@ -1381,6 +1387,68 @@ test.each([0, 1, 12])(
     }
 );
 
+test('given compact list rows, type icons replace subtitles and metric values remain inline', async () => {
+    const items = [
+        entryFixture({
+            id: 'group',
+            name: 'Group name',
+            childIds: ['delivery', 'capability', 'decision']
+        }),
+        entryFixture({ id: 'delivery', type: 'goal', name: 'Delivery goal', childIds: ['metric'] }),
+        entryFixture({
+            id: 'capability',
+            type: 'goal',
+            name: 'Capability goal',
+            goalCategory: 'Capability'
+        }),
+        entryFixture({
+            id: 'decision',
+            type: 'goal',
+            name: 'Decision goal',
+            goalCategory: 'Decision'
+        }),
+        entryFixture({
+            id: 'metric',
+            type: 'metric',
+            name: 'Completion',
+            currentValue: 25,
+            targetValue: 100,
+            unit: '%'
+        })
+    ];
+    localStorage.setItem(
+        'compass-preview-v1',
+        JSON.stringify({ items, labels: [], updatedAt: null })
+    );
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    expect(container.querySelector('.goal-row-meta')).toBeNull();
+    expect(container.querySelector('[data-entry-id="group"] .goal-name')?.textContent).toBe(
+        'GroupGroup name'
+    );
+    expect(
+        container
+            .querySelector('[data-entry-id="delivery"] .entry-icon-delivery')
+            ?.getAttribute('aria-label')
+    ).toBe('Delivery');
+    expect(
+        container.querySelector('[data-entry-id="metric"] .metric-progress')?.textContent
+    ).toContain('25 / 100 %');
+    expect(container.querySelector<HTMLTableColElement>('col.column-parents')?.style.width).toBe(
+        '5%'
+    );
+    expect(container.querySelector<HTMLTableColElement>('col.column-metrics')?.style.width).toBe(
+        '5%'
+    );
+    expect(container.querySelector('[aria-label="Parent goals"]')?.getAttribute('title')).toBe(
+        'Parent goals'
+    );
+    expect(container.querySelector('[aria-label="Metrics"]')?.getAttribute('title')).toBe(
+        'Metrics'
+    );
+});
+
 test('given a table column resizer, arrow keys adjust the adjacent column widths', () => {
     const items = [entryFixture({ id: 'group', type: 'group' })];
     act(() => {
@@ -1407,11 +1475,11 @@ test('given a table column resizer, arrow keys adjust the adjacent column widths
     const columns = required(
         container.querySelectorAll<HTMLTableColElement>('#workspace-entry-table col')
     );
-    expect(nameResizer.getAttribute('aria-valuenow')).toBe('40');
+    expect(nameResizer.getAttribute('aria-valuenow')).toBe('48');
     act(() => Simulate.keyDown(nameResizer, { key: 'ArrowRight' }));
-    expect(nameResizer.getAttribute('aria-valuenow')).toBe('42');
-    expect(columns[0].style.width).toBe('42%');
-    expect(columns[1].style.width).toBe('17%');
+    expect(nameResizer.getAttribute('aria-valuenow')).toBe('50');
+    expect(columns[0].style.width).toBe('50%');
+    expect(columns[1].style.width).toBe('19%');
 });
 
 test('given a table column resizer, pointer dragging adjusts adjacent column widths', () => {
@@ -1447,9 +1515,9 @@ test('given a table column resizer, pointer dragging adjusts adjacent column wid
     const columns = required(
         container.querySelectorAll<HTMLTableColElement>('#workspace-entry-table col')
     );
-    expect(nameResizer.getAttribute('aria-valuenow')).toBe('43');
-    expect(columns[0].style.width).toBe('43%');
-    expect(columns[1].style.width).toBe('16%');
+    expect(nameResizer.getAttribute('aria-valuenow')).toBe('51');
+    expect(columns[0].style.width).toBe('51%');
+    expect(columns[1].style.width).toBe('18%');
 });
 
 test('given a Jira avatar URL, the user chip shows the image and name and falls back to initials on failure', async () => {
