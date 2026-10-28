@@ -80,6 +80,87 @@ test('given the type dropdown, goal categories filter separately and retain matc
     expect(required(container.querySelector('.connection-count')).textContent).toBe('4 entries');
 });
 
+test('given a collapsed toolbar, active filters and actions remain available and the preference survives reopening', async () => {
+    const items = [
+        entryFixture({ id: 'matching', type: 'goal', name: 'Matching goal' }),
+        entryFixture({ id: 'other', type: 'goal', name: 'Other goal' })
+    ];
+    localStorage.setItem(
+        'compass-preview-v1',
+        JSON.stringify({ items, labels: [], updatedAt: null })
+    );
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    const toolbar = required(container.querySelector<HTMLElement>('#workspace-toolbar'));
+    expect(toolbar.hidden).toBe(false);
+    expect(container.querySelector('.list-heading')).toBeNull();
+    act(() =>
+        changeValue(
+            required(container.querySelector('[aria-label="Search workspace"]')),
+            'Matching'
+        )
+    );
+    act(() => Simulate.click(required(container.querySelector('[aria-label="Collapse toolbar"]'))));
+    expect(toolbar.hidden).toBe(true);
+    expect(localStorage.getItem('compass-toolbar-expanded')).toBe('false');
+    expect(container.querySelector('[data-entry-id="matching"]')).not.toBeNull();
+    expect(container.querySelector('[data-entry-id="other"]')).toBeNull();
+    expect(
+        container.querySelector('[aria-label="Expand toolbar"]')?.getAttribute('aria-expanded')
+    ).toBe('false');
+    expect(container.querySelector('.app-header [aria-label="Refresh workspace"]')).not.toBeNull();
+    act(() =>
+        Simulate.click(required(container.querySelector('[aria-label="Show 1 active filters"]')))
+    );
+    expect(toolbar.hidden).toBe(false);
+    expect(
+        required(container.querySelector<HTMLInputElement>('[aria-label="Search workspace"]')).value
+    ).toBe('Matching');
+    act(() => Simulate.click(required(container.querySelector('[aria-label="Clear filters"]'))));
+    expect(container.querySelector('[data-entry-id="other"]')).not.toBeNull();
+    act(() => Simulate.click(required(container.querySelector('[aria-label="Collapse toolbar"]'))));
+    await act(async () => {
+        ReactDOM.unmountComponentAtNode(container);
+        ReactDOM.render(<App />, container);
+    });
+    expect(required(container.querySelector<HTMLElement>('#workspace-toolbar')).hidden).toBe(true);
+    act(() => {
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('.header-actions button')].find(
+                    (button) => button.textContent?.trim() === 'New goal'
+                )
+            )
+        );
+    });
+    expect(container.querySelector('dialog')).not.toBeNull();
+    expect(savedGraph().items).toEqual(items);
+});
+
+test('given a graph, collapsing the toolbar preserves its network and selection', async () => {
+    const items = [entryFixture({ id: 'goal', type: 'goal' })];
+    localStorage.setItem(
+        'compass-preview-v1',
+        JSON.stringify({ items, labels: [], updatedAt: null })
+    );
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    act(() => Simulate.click(required(container.querySelector('[aria-label="Graph"]'))));
+    const instance: NetworkMock = mockNetwork.mock.results[0].value;
+    act(() => {
+        required(instance.on.mock.calls.find(([eventName]) => eventName === 'selectNode'))[1]({
+            nodes: ['goal']
+        });
+    });
+    act(() => Simulate.click(required(container.querySelector('[aria-label="Collapse toolbar"]'))));
+    expect(mockNetwork).toHaveBeenCalledTimes(1);
+    expect(instance.destroy).not.toHaveBeenCalled();
+    expect(instance.selectNodes).toHaveBeenLastCalledWith(['goal'], false);
+    expect(container.querySelector('.details')).not.toBeNull();
+});
+
 test('given the New goal dialog, fields follow the requested order and parent selection remains available', async () => {
     localStorage.setItem(
         'compass-preview-v1',
@@ -466,7 +547,7 @@ test('given filtered workspace data, exporting downloads all entries and labels 
     act(() =>
         Simulate.click(
             required(
-                [...container.querySelectorAll<HTMLButtonElement>('.header-actions button')].find(
+                [...container.querySelectorAll<HTMLButtonElement>('.toolbar-actions button')].find(
                     (button) => button.textContent?.trim() === 'Export'
                 )
             )

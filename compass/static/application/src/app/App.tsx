@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
     Check,
+    ChevronDown,
+    ChevronUp,
+    Filter,
     Folder as GroupIcon,
     Compass,
     GitBranch,
@@ -14,6 +17,7 @@ import {
     RefreshCw,
     Search,
     Tags,
+    X,
     ZoomIn,
     ZoomOut
 } from 'lucide-react';
@@ -66,6 +70,13 @@ function App() {
     const sidebarResize = useRef<{ startX: number; width: number } | null>(null);
     const [search, setSearch] = useState('');
     const [mode, setMode] = useState<ViewMode>('list');
+    const [toolbarExpanded, setToolbarExpanded] = useState(() => {
+        try {
+            return localStorage.getItem('compass-toolbar-expanded') !== 'false';
+        } catch {
+            return true;
+        }
+    });
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
@@ -172,6 +183,11 @@ function App() {
         typeFilter.length !== typeOptions.length ||
         labelFilter.length > 0 ||
         search.length > 0;
+    const activeFilterCount =
+        Number(search.length > 0) +
+        Number(typeFilter.length !== typeOptions.length) +
+        Number(assigneeFilter.length > 0) +
+        Number(labelFilter.length > 0);
     const listCountLabel = `${visibleItems.length} ${filtered ? (visibleItems.length === 1 ? 'match' : 'matches') : visibleItems.length === 1 ? 'entry' : 'entries'}`;
     const relationshipIds = new Set(relationshipItems.map((item) => item.id));
     const connections = relationshipItems.reduce(
@@ -215,6 +231,19 @@ function App() {
                 onChange={setLabelFilter}
                 label="Filter by label"
             />
+            {filtered && (
+                <IconButton
+                    label="Clear filters"
+                    onClick={() => {
+                        setSearch('');
+                        setTypeFilter(typeOptions.map((option) => option.value));
+                        setAssigneeFilter([]);
+                        setLabelFilter([]);
+                    }}
+                >
+                    <X size={16} />
+                </IconButton>
+            )}
         </div>
     );
 
@@ -224,20 +253,116 @@ function App() {
         setDialog('create');
     }
 
+    function setToolbarVisibility(expanded: boolean): void {
+        setToolbarExpanded(expanded);
+        try {
+            localStorage.setItem('compass-toolbar-expanded', String(expanded));
+        } catch {
+            return;
+        }
+    }
+
+    const viewControls = (
+        <div className="graph-toolbar">
+            <div className="view-switch" role="group" aria-label="Layout">
+                <button
+                    type="button"
+                    aria-label="List"
+                    title="List"
+                    aria-pressed={mode === 'list'}
+                    onClick={() => setMode('list')}
+                >
+                    <List size={16} />
+                    <span className="view-label">List</span>
+                </button>
+                <button
+                    type="button"
+                    aria-label="Graph"
+                    title="Graph"
+                    aria-pressed={mode === 'graph'}
+                    onClick={() => setMode('graph')}
+                >
+                    <Network size={16} />
+                    <span className="view-label">Graph</span>
+                </button>
+                <button
+                    type="button"
+                    aria-label="Tree"
+                    title="Tree"
+                    aria-pressed={mode === 'tree'}
+                    onClick={() => setMode('tree')}
+                >
+                    <ListTree size={16} />
+                    <span className="view-label">Tree</span>
+                </button>
+                <button
+                    type="button"
+                    aria-label="Labels"
+                    title="Labels"
+                    aria-pressed={mode === 'labels'}
+                    onClick={() => setMode('labels')}
+                >
+                    <Tags size={16} />
+                    <span className="view-label">Labels</span>
+                </button>
+            </div>
+            <div className="view-toolbar-actions">
+                {mode !== 'labels' && selected && selected.type !== 'group' && (
+                    <IconButton
+                        label={`Show full ${mode === 'list' ? 'list' : mode}`}
+                        onClick={() => setSelectedId(null)}
+                    >
+                        <ListTree size={16} />
+                    </IconButton>
+                )}
+                <span className="connection-count">
+                    {mode === 'list'
+                        ? listCountLabel
+                        : mode === 'labels'
+                          ? `${labels.length} labels`
+                          : `${relationshipItems.length} items · ${connections} relationships`}
+                </span>
+                {!toolbarExpanded && mode !== 'labels' && filtered && (
+                    <button
+                        type="button"
+                        className="active-filter-indicator"
+                        title={`Show ${activeFilterCount} active filters`}
+                        aria-label={`Show ${activeFilterCount} active filters`}
+                        onClick={() => setToolbarVisibility(true)}
+                    >
+                        <Filter size={14} />
+                        <span>{activeFilterCount}</span>
+                    </button>
+                )}
+                <IconButton
+                    label="Refresh workspace"
+                    disabled={loading || busy}
+                    onClick={() => {
+                        if (mode === 'graph' || mode === 'tree') setSelectedId(null);
+                        setReload((value) => value + 1);
+                    }}
+                >
+                    <RefreshCw size={16} className={loading ? 'spin' : ''} />
+                </IconButton>
+            </div>
+        </div>
+    );
+
     return (
         <main className="app">
             <header className="app-header">
-                <div className="brand">
+                <div className="brand" title={isPreview ? 'Local preview' : 'Shared workspace'}>
                     <span className="brand-mark">
                         <Compass size={25} strokeWidth={1.7} />
                     </span>
                     <div>
                         <h1>Compass</h1>
-                        <span className="workspace-label">
+                        <span className="workspace-label visually-hidden">
                             {isPreview ? 'Local preview' : 'Shared workspace'}
                         </span>
                     </div>
                 </div>
+                {viewControls}
                 <div className="header-actions">
                     <span className="save-status" role="status">
                         {busy ? (
@@ -252,6 +377,31 @@ function App() {
                             </React.Fragment>
                         ) : null}
                     </span>
+                    <button
+                        className="button primary"
+                        disabled={
+                            loading || busy || items.length >= 100 || Boolean(error && !updatedAt)
+                        }
+                        onClick={() =>
+                            openCreate('goal', selected?.type === 'group' ? selected.id : '')
+                        }
+                    >
+                        <Plus size={17} />
+                        New goal
+                    </button>
+                    <IconButton
+                        label={toolbarExpanded ? 'Collapse toolbar' : 'Expand toolbar'}
+                        aria-expanded={toolbarExpanded}
+                        aria-controls="workspace-toolbar"
+                        onClick={() => setToolbarVisibility(!toolbarExpanded)}
+                    >
+                        {toolbarExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                    </IconButton>
+                </div>
+            </header>
+            <div id="workspace-toolbar" className="workspace-toolbar" hidden={!toolbarExpanded}>
+                {mode !== 'labels' && workspaceFilters}
+                <div className="toolbar-actions">
                     <WorkspaceTransfer
                         graph={{ items, labels }}
                         disabled={loading || busy}
@@ -279,20 +429,8 @@ function App() {
                         <GroupIcon size={17} />
                         New group
                     </button>
-                    <button
-                        className="button primary"
-                        disabled={
-                            loading || busy || items.length >= 100 || Boolean(error && !updatedAt)
-                        }
-                        onClick={() =>
-                            openCreate('goal', selected?.type === 'group' ? selected.id : '')
-                        }
-                    >
-                        <Plus size={17} />
-                        New goal
-                    </button>
                 </div>
-            </header>
+            </div>
             {error && (
                 <div className="error-banner" role="alert">
                     <span>{error}</span>
@@ -378,70 +516,6 @@ function App() {
                     </button>
                 )}
                 <section className="graph-workspace" aria-label="Goals workspace">
-                    <div className="graph-toolbar">
-                        <div className="view-switch" role="group" aria-label="Layout">
-                            <button
-                                type="button"
-                                aria-pressed={mode === 'list'}
-                                onClick={() => setMode('list')}
-                            >
-                                <List size={16} />
-                                List
-                            </button>
-                            <button
-                                type="button"
-                                aria-pressed={mode === 'graph'}
-                                onClick={() => setMode('graph')}
-                            >
-                                <Network size={16} />
-                                Graph
-                            </button>
-                            <button
-                                type="button"
-                                aria-pressed={mode === 'tree'}
-                                onClick={() => setMode('tree')}
-                            >
-                                <ListTree size={16} />
-                                Tree
-                            </button>
-                            <button
-                                type="button"
-                                aria-pressed={mode === 'labels'}
-                                onClick={() => setMode('labels')}
-                            >
-                                <Tags size={16} />
-                                Labels
-                            </button>
-                        </div>
-                        <div className="view-toolbar-actions">
-                            {mode !== 'labels' && selected && selected.type !== 'group' && (
-                                <IconButton
-                                    label={`Show full ${mode === 'list' ? 'list' : mode}`}
-                                    onClick={() => setSelectedId(null)}
-                                >
-                                    <ListTree size={16} />
-                                </IconButton>
-                            )}
-                            <span className="connection-count">
-                                {mode === 'list'
-                                    ? listCountLabel
-                                    : mode === 'labels'
-                                      ? `${labels.length} labels`
-                                      : `${relationshipItems.length} items · ${connections} relationships`}
-                            </span>
-                            <IconButton
-                                label="Refresh workspace"
-                                disabled={loading || busy}
-                                onClick={() => {
-                                    if (mode === 'graph' || mode === 'tree') setSelectedId(null);
-                                    setReload((value) => value + 1);
-                                }}
-                            >
-                                <RefreshCw size={16} className={loading ? 'spin' : ''} />
-                            </IconButton>
-                        </div>
-                    </div>
-                    {mode !== 'labels' && workspaceFilters}
                     {mode === 'labels' ? (
                         <LabelManager
                             labels={labels}
@@ -464,9 +538,6 @@ function App() {
                         />
                     ) : mode === 'list' ? (
                         <div className="list-workspace">
-                            <div className="list-heading">
-                                <h2>Goals</h2>
-                            </div>
                             {loading ? (
                                 <div className="list-empty" role="status">
                                     <LoaderCircle size={24} className="spin" />

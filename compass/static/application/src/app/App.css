@@ -133,6 +133,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    min-width: 0;
 }
 .hierarchy-name {
     display: flex;
@@ -211,19 +212,6 @@
     flex-direction: column;
     flex: 1;
 }
-.list-heading {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 20px;
-    border-bottom: 1px solid var(--line);
-}
-.list-heading h2 {
-    font-size: 18px;
-    overflow-wrap: anywhere;
-}
 .list-filters {
     display: flex;
     align-items: center;
@@ -232,8 +220,8 @@
     max-width: 100%;
 }
 .workspace-filters {
-    padding: 12px 24px;
-    border-bottom: 1px solid var(--line);
+    padding: 0;
+    flex: 1;
 }
 .workspace-filters .search-field {
     width: 260px;
@@ -278,8 +266,8 @@
     color: var(--muted);
     font-size: 12px;
     font-weight: 600;
-    padding-top: 10px;
-    padding-bottom: 10px;
+    padding-top: 5px;
+    padding-bottom: 5px;
 }
 .goal-table th:first-child {
     padding-left: 20px;
@@ -434,20 +422,14 @@
 }
 @media (max-width: 600px) {
     .app-header {
-        flex-wrap: wrap;
+        grid-template-columns: minmax(0, 1fr) auto;
     }
     .header-actions {
-        width: 100%;
+        width: auto;
         justify-content: flex-end;
-    }
-    .list-heading {
-        padding: 16px;
     }
     .list-filters {
         width: 100%;
-    }
-    .workspace-filters {
-        padding: 10px 14px;
     }
     .list-filters .search-field {
         width: 100%;
@@ -575,19 +557,21 @@
     overflow: hidden;
 }
 .app-header,
+.workspace-toolbar,
 .error-banner,
 .graph-toolbar,
 .workspace-filters,
-.list-heading,
 .graph-footer {
     flex-shrink: 0;
 }
 .app-header {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    padding: 16px 24px;
+    gap: 20px;
+    min-height: 48px;
+    padding: 0 16px;
     border-bottom: 1px solid var(--line);
 }
 .brand,
@@ -598,12 +582,12 @@
     align-items: center;
 }
 .brand {
-    gap: 12px;
+    gap: 8px;
     min-width: 0;
 }
 .brand-mark {
-    width: 32px;
-    height: 32px;
+    width: 26px;
+    height: 26px;
     display: grid;
     place-items: center;
     color: var(--white);
@@ -619,11 +603,49 @@
     font-weight: 400;
 }
 .header-actions {
-    gap: 18px;
+    gap: 8px;
     flex-shrink: 0;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: flex-end;
     max-width: 100%;
+}
+.brand h1 {
+    font-size: 16px;
+}
+.workspace-toolbar:not([hidden]) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--line);
+}
+.workspace-toolbar .checkbox-dropdown > summary {
+    min-width: 130px;
+}
+.workspace-toolbar .search-field input {
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+.toolbar-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-left: auto;
+}
+.active-filter-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 4px 6px;
+    border: 0;
+    color: var(--blue);
+    background: var(--blue-soft);
+    font-size: 11px;
 }
 .transfer-error {
     flex-basis: 100%;
@@ -811,16 +833,16 @@
     justify-content: space-between;
     align-items: center;
     gap: 10px;
-    padding: 0 24px;
+    min-width: 0;
+    padding: 0;
     min-height: 48px;
-    border-bottom: 1px solid var(--line);
 }
 .view-switch {
     display: inline-flex;
     padding: 0;
     background: transparent;
     border-radius: 0;
-    gap: 20px;
+    gap: 16px;
 }
 .view-switch button {
     display: flex;
@@ -846,6 +868,9 @@
     font-size: 11px;
     color: var(--muted);
     white-space: nowrap;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .graph-surface {
     position: relative;
@@ -1088,6 +1113,24 @@ select:focus {
     font-size: 13px;
     overflow-wrap: anywhere;
 }
+@media (max-width: 1000px) {
+    .app-header {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0 12px;
+    }
+    .app-header > .graph-toolbar {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        min-height: 40px;
+    }
+    .header-actions {
+        justify-self: end;
+    }
+    .view-switch button {
+        min-height: 40px;
+        padding: 8px 0;
+    }
+}
 @media (max-width: 1100px) {
     .sidebar-resizer {
         display: none;
@@ -1117,21 +1160,25 @@ select:focus {
 }
 @media (max-width: 600px) {
     .app-header {
-        padding: 16px;
-        gap: 10px;
+        padding: 0 12px;
+        gap: 0 8px;
     }
     .brand {
         gap: 8px;
     }
     .brand-mark {
-        width: 36px;
-        height: 36px;
+        width: 24px;
+        height: 24px;
     }
     .header-actions {
         gap: 6px;
     }
     .save-status {
-        font-size: 10px;
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
     }
     .workspace-label {
         font-size: 9px;
@@ -1140,11 +1187,43 @@ select:focus {
         margin-bottom: 8px;
     }
     .graph-toolbar {
-        flex-wrap: wrap;
-        padding: 10px 14px;
+        flex-wrap: nowrap;
+        padding: 0;
+        gap: 8px;
     }
     .view-toolbar-actions {
         margin-left: auto;
+        gap: 4px;
+    }
+    .view-switch {
+        gap: 4px;
+        flex-shrink: 0;
+    }
+    .view-switch button {
+        justify-content: center;
+        width: 32px;
+        min-height: 40px;
+    }
+    .view-label {
+        display: none;
+    }
+    .workspace-toolbar:not([hidden]) {
+        padding: 8px 12px;
+    }
+    .workspace-toolbar .workspace-filters {
+        flex-basis: 100%;
+    }
+    .workspace-toolbar .search-field {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+    .workspace-toolbar .checkbox-dropdown {
+        flex: 1 1 120px;
+        width: auto;
+    }
+    .workspace-toolbar .checkbox-dropdown > summary {
+        min-width: 0;
+        width: 100%;
     }
     .list-workspace,
     .goal-list-view {
