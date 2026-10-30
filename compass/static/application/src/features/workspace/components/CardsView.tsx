@@ -90,15 +90,48 @@ export default function CardsView({ items, labels, selectedId, onSelect }: Cards
                         {selected.description && <p>{selected.description}</p>}
                     </header>
                     <div className="delivery-card-content">
-                        <div className="delivery-card-target-row">
-                            <span>Target month</span>
-                            {selected.targetDate ? (
-                                <time dateTime={`${selected.targetDate}-01`}>
-                                    {formatTargetMonth(selected.targetDate)}
-                                </time>
-                            ) : (
-                                <span className="muted">Not set</span>
-                            )}
+                        <div className="delivery-card-planning-box">
+                            <div className="delivery-card-target-row">
+                                <span>Target month</span>
+                                {selected.targetDate ? (
+                                    <time dateTime={`${selected.targetDate}-01`}>
+                                        {formatTargetMonth(selected.targetDate)}
+                                    </time>
+                                ) : (
+                                    <span className="muted">Not set</span>
+                                )}
+                            </div>
+                            <div className="delivery-card-data-grid">
+                                <CardSection title="Metrics">
+                                    {metrics.length ? (
+                                        <ul className="delivery-card-metrics">
+                                            {metrics.map((metric) => (
+                                                <li key={metric.id}>
+                                                    <span>{metric.name}</span>
+                                                    <span className="delivery-metric-value">
+                                                        {metric.currentValue ?? 'Not set'} /{' '}
+                                                        {metric.targetValue ?? 'Not set'}{' '}
+                                                        {metric.unit || ''}
+                                                    </span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="delivery-category-empty">-</p>
+                                    )}
+                                </CardSection>
+                                <CardSection title="Labels">
+                                    {selectedLabels.length ? (
+                                        <div className="delivery-card-labels">
+                                            {selectedLabels.map((label) => (
+                                                <LabelChip key={label.id} label={label} />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="delivery-category-empty">-</p>
+                                    )}
+                                </CardSection>
+                            </div>
                         </div>
                         {selected.assignees.length > 0 && (
                             <CardSection title="Assignees">
@@ -172,37 +205,6 @@ export default function CardsView({ items, labels, selectedId, onSelect }: Cards
                                     )}
                                 </section>
                             ))}
-                        </div>
-                        <div className="delivery-card-data-grid">
-                            <CardSection title="Metrics">
-                                {metrics.length ? (
-                                    <ul className="delivery-card-metrics">
-                                        {metrics.map((metric) => (
-                                            <li key={metric.id}>
-                                                <span>{metric.name}</span>
-                                                <span className="delivery-metric-value">
-                                                    {metric.currentValue ?? 'Not set'} /{' '}
-                                                    {metric.targetValue ?? 'Not set'}{' '}
-                                                    {metric.unit || ''}
-                                                </span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <p className="delivery-category-empty">-</p>
-                                )}
-                            </CardSection>
-                            <CardSection title="Labels">
-                                {selectedLabels.length ? (
-                                    <div className="delivery-card-labels">
-                                        {selectedLabels.map((label) => (
-                                            <LabelChip key={label.id} label={label} />
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="delivery-category-empty">-</p>
-                                )}
-                            </CardSection>
                         </div>
                     </div>
                 </article>

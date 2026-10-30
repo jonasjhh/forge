@@ -1024,13 +1024,20 @@ test('given the Cards tab, deliveries show only existing fields and related work
     );
     expect(container.querySelector('.delivery-card .goal-status-yellow')).not.toBeNull();
     const cardHeader = required(container.querySelector('.delivery-card-header'));
+    const planningBox = required(container.querySelector('.delivery-card-planning-box'));
     const cardTargetMonth = required(container.querySelector('.delivery-card-target-row'));
+    const dataGrid = required(container.querySelector('.delivery-card-data-grid'));
     const cardGoalGrid = required(container.querySelector('.delivery-goal-grid'));
     expect(
         cardHeader.compareDocumentPosition(cardTargetMonth) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     expect(
-        cardTargetMonth.compareDocumentPosition(cardGoalGrid) & Node.DOCUMENT_POSITION_FOLLOWING
+        cardHeader.compareDocumentPosition(planningBox) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(planningBox.firstElementChild).toBe(cardTargetMonth);
+    expect(planningBox.children[1]).toBe(dataGrid);
+    expect(
+        dataGrid.compareDocumentPosition(cardGoalGrid) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     expect(container.querySelector('.delivery-card')?.textContent).toContain('Alex Morgan');
     expect(container.querySelector('.delivery-card')?.textContent).toContain('Program OKR');

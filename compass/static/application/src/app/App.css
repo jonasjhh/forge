@@ -901,9 +901,23 @@
     justify-content: space-between;
     gap: 12px;
     padding: 11px 20px;
-    border-bottom: 1px solid var(--line);
-    background: var(--subtle);
+    border-bottom: 1px solid #e8c85b;
+    background: transparent;
     font-size: 12px;
+}
+.delivery-card-planning-box {
+    margin-bottom: 14px;
+    overflow: hidden;
+    border: 1px solid #d6ad2b;
+    border-radius: 4px;
+    background: #fff9e8;
+}
+.delivery-card-planning-box .delivery-card-target-row {
+    padding-right: 14px;
+    padding-left: 14px;
+}
+.delivery-card-planning-box .delivery-card-section {
+    border-bottom: 0;
 }
 .delivery-card-target-row > span:first-child {
     color: var(--muted);
@@ -993,7 +1007,8 @@
 .delivery-card-data-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 24px;
+    gap: 20px;
+    padding: 0 14px 4px;
 }
 .delivery-card-section {
     min-width: 0;
@@ -1592,13 +1607,15 @@ select:focus {
     }
     .delivery-card-data-grid {
         gap: 14px;
+        padding-right: 12px;
+        padding-left: 12px;
     }
     .delivery-card-header {
         padding: 14px;
     }
-    .delivery-card-target-row {
-        padding-right: 14px;
-        padding-left: 14px;
+    .delivery-card-planning-box .delivery-card-target-row {
+        padding-right: 12px;
+        padding-left: 12px;
     }
     .details {
         display: block;
