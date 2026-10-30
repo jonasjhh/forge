@@ -1,8 +1,8 @@
 import React from 'react';
 import AssigneeChip from '../../../components/assignees/AssigneeChip';
 import LabelChip from '../../../components/labels/LabelChip';
-import { goalCategories } from '../model/entries';
-import type { WorkspaceEntry, WorkspaceLabel } from '../../../types/workspace';
+import { goalCategoryStyles } from '../model/entries';
+import type { GoalCategory, WorkspaceEntry, WorkspaceLabel } from '../../../types/workspace';
 
 interface CardsViewProps {
     items: WorkspaceEntry[];
@@ -19,6 +19,8 @@ function CardSection({ title, children }: { title: string; children: React.React
         </section>
     );
 }
+
+const cardGoalCategories: GoalCategory[] = ['Delivery', 'Capability', 'Decision'];
 
 export default function CardsView({ items, labels, selectedId, onSelect }: CardsViewProps) {
     const deliveries = items.filter(
@@ -41,12 +43,13 @@ export default function CardsView({ items, labels, selectedId, onSelect }: Cards
         .map((id) => itemsById.get(id))
         .filter((item): item is WorkspaceEntry => Boolean(item));
     const subGoals = children.filter((item) => item.type === 'goal');
-    const subGoalsByCategory = goalCategories
-        .map((category) => ({
-            category,
-            goals: subGoals.filter((goal) => (goal.goalCategory ?? 'Delivery') === category)
-        }))
-        .filter(({ goals }) => goals.length > 0);
+    const relatedGoals = selected
+        ? [...new Map([...parents, ...subGoals].map((goal) => [goal.id, goal])).values()]
+        : [];
+    const goalsByCategory = cardGoalCategories.map((category) => ({
+        category,
+        goals: relatedGoals.filter((goal) => (goal.goalCategory ?? 'Delivery') === category)
+    }));
     const metrics = children.filter((item) => item.type === 'metric');
 
     return (
@@ -93,60 +96,74 @@ export default function CardsView({ items, labels, selectedId, onSelect }: Cards
                                 </div>
                             </CardSection>
                         )}
-                        {selectedLabels.length > 0 && (
-                            <CardSection title="Labels">
-                                <div className="delivery-card-labels">
-                                    {selectedLabels.map((label) => (
-                                        <LabelChip key={label.id} label={label} />
-                                    ))}
-                                </div>
-                            </CardSection>
-                        )}
-                        {parents.length > 0 && (
-                            <CardSection title="Parent goals">
-                                <ul className="delivery-card-relations">
-                                    {parents.map((parent) => (
-                                        <li key={parent.id}>{parent.name}</li>
-                                    ))}
-                                </ul>
-                            </CardSection>
-                        )}
-                        {subGoals.length > 0 && (
-                            <CardSection title="Sub-goals">
-                                <div className="delivery-subgoal-groups">
-                                    {subGoalsByCategory.map(({ category, goals }) => (
-                                        <section
-                                            key={category}
-                                            className="delivery-subgoal-group"
-                                            data-subgoal-category={category}
-                                        >
-                                            <h4>{category}</h4>
-                                            <ul className="delivery-card-relations">
-                                                {goals.map((goal) => (
-                                                    <li key={goal.id}>{goal.name}</li>
-                                                ))}
-                                            </ul>
-                                        </section>
-                                    ))}
-                                </div>
-                            </CardSection>
-                        )}
-                        {metrics.length > 0 && (
+                        <div className="delivery-goal-grid" aria-label="Related goals by category">
+                            {goalsByCategory.map(({ category, goals }) => (
+                                <section
+                                    key={category}
+                                    className={`delivery-goal-column delivery-goal-${category.toLowerCase()}`}
+                                    data-goal-category={category}
+                                    style={
+                                        {
+                                            '--goal-category-color':
+                                                goalCategoryStyles[category].border,
+                                            '--goal-category-background':
+                                                goalCategoryStyles[category].color
+                                        } as React.CSSProperties
+                                    }
+                                >
+                                    <h3>{category}</h3>
+                                    {goals.length ? (
+                                        <ul className="delivery-card-relations">
+                                            {goals.map((goal) => (
+                                                <li
+                                                    key={goal.id}
+                                                    className={
+                                                        goal.id === selected.id
+                                                            ? 'is-selected-delivery'
+                                                            : ''
+                                                    }
+                                                >
+                                                    {goal.name}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="delivery-category-empty">-</p>
+                                    )}
+                                </section>
+                            ))}
+                        </div>
+                        <div className="delivery-card-data-grid">
                             <CardSection title="Metrics">
-                                <ul className="delivery-card-metrics">
-                                    {metrics.map((metric) => (
-                                        <li key={metric.id}>
-                                            <span>{metric.name}</span>
-                                            <span className="delivery-metric-value">
-                                                {metric.currentValue ?? 'Not set'} /{' '}
-                                                {metric.targetValue ?? 'Not set'}{' '}
-                                                {metric.unit || ''}
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
+                                {metrics.length ? (
+                                    <ul className="delivery-card-metrics">
+                                        {metrics.map((metric) => (
+                                            <li key={metric.id}>
+                                                <span>{metric.name}</span>
+                                                <span className="delivery-metric-value">
+                                                    {metric.currentValue ?? 'Not set'} /{' '}
+                                                    {metric.targetValue ?? 'Not set'}{' '}
+                                                    {metric.unit || ''}
+                                                </span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className="delivery-category-empty">-</p>
+                                )}
                             </CardSection>
-                        )}
+                            <CardSection title="Labels">
+                                {selectedLabels.length ? (
+                                    <div className="delivery-card-labels">
+                                        {selectedLabels.map((label) => (
+                                            <LabelChip key={label.id} label={label} />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="delivery-category-empty">-</p>
+                                )}
+                            </CardSection>
+                        </div>
                     </div>
                 </article>
             ) : (

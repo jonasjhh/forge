@@ -845,9 +845,51 @@
 }
 .delivery-card-content {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0 24px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
     padding: 4px 20px 14px;
+}
+.delivery-goal-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+}
+.delivery-goal-column {
+    min-width: 0;
+    min-height: 112px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--goal-category-color) 45%, white);
+    border-top: 3px solid var(--goal-category-color);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--goal-category-background) 48%, white);
+}
+.delivery-goal-column h3 {
+    margin-bottom: 9px;
+    color: var(--goal-category-color);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.delivery-goal-column .delivery-card-relations {
+    gap: 8px;
+}
+.delivery-goal-column .delivery-card-relations li {
+    padding-left: 8px;
+    border-left: 2px solid color-mix(in srgb, var(--goal-category-color) 50%, white);
+}
+.delivery-goal-column .is-selected-delivery {
+    font-weight: 700;
+}
+.delivery-category-empty {
+    color: var(--muted);
+    font-size: 12px;
+}
+.delivery-card-data-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
 }
 .delivery-card-section {
     min-width: 0;
@@ -872,16 +914,6 @@
 .delivery-card-metrics {
     display: grid;
     gap: 7px;
-}
-.delivery-subgoal-groups {
-    display: grid;
-    gap: 12px;
-}
-.delivery-subgoal-group h4 {
-    margin-bottom: 5px;
-    color: var(--muted);
-    font-size: 11px;
-    font-weight: 600;
 }
 .delivery-card-relations li,
 .delivery-card-metrics li {
@@ -1446,6 +1478,16 @@ select:focus {
         grid-template-columns: minmax(0, 1fr);
         padding-right: 14px;
         padding-left: 14px;
+    }
+    .delivery-goal-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+    }
+    .delivery-goal-column {
+        min-height: 0;
+    }
+    .delivery-card-data-grid {
+        gap: 14px;
     }
     .delivery-card-header {
         padding: 14px;

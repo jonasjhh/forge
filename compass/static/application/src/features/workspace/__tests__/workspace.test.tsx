@@ -965,6 +965,11 @@ test('given the Cards tab, deliveries show only existing fields and related work
     await act(async () => {
         ReactDOM.render(<App />, container);
     });
+    expect(
+        [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].map((button) =>
+            button.getAttribute('aria-label')
+        )
+    ).toEqual(['List', 'Cards', 'Graph', 'Tree', 'Labels']);
     act(() => Simulate.click(required(container.querySelector('[aria-label="Cards"]'))));
 
     const deliveryList = required(container.querySelector('[aria-label="Deliveries"]'));
@@ -984,10 +989,20 @@ test('given the Cards tab, deliveries show only existing fields and related work
     expect(container.querySelector('.delivery-card')?.textContent).toContain('Objective');
     expect(container.querySelector('.delivery-card')?.textContent).toContain('Automate intake');
     expect(
-        [...container.querySelectorAll<HTMLElement>('.delivery-subgoal-group')].map(
-            (group) => group.dataset.subgoalCategory
+        [...container.querySelectorAll<HTMLElement>('.delivery-goal-column')].map(
+            (column) => column.dataset.goalCategory
         )
-    ).toEqual(['Decision', 'Capability', 'Delivery']);
+    ).toEqual(['Delivery', 'Capability', 'Decision']);
+    expect(container.querySelector('.delivery-goal-delivery')?.textContent).toContain(
+        'Automate intake'
+    );
+    expect(container.querySelector('.delivery-goal-delivery')?.textContent).not.toContain(
+        'Improve digital process'
+    );
+    expect(container.querySelector('.delivery-goal-decision')?.textContent).toContain('Objective');
+    expect(container.querySelector('.delivery-goal-decision')?.textContent).toContain(
+        'Approve exception handling'
+    );
     expect(container.querySelector('.delivery-card')?.textContent).toContain(
         'Approve exception handling'
     );
@@ -997,6 +1012,12 @@ test('given the Cards tab, deliveries show only existing fields and related work
     expect(container.querySelector('.delivery-card')?.textContent).toContain('20 / 70 %');
     expect(container.querySelector('.delivery-card')?.textContent).not.toContain('Status');
     expect(container.querySelector('.delivery-card')?.textContent).not.toContain('Risk');
+    expect(container.querySelector('.delivery-card-data-grid')).not.toBeNull();
+    expect(
+        [...container.querySelectorAll<HTMLElement>('.delivery-card-data-grid > section h3')].map(
+            (heading) => heading.textContent
+        )
+    ).toEqual(['Metrics', 'Labels']);
 
     act(() =>
         Simulate.click(

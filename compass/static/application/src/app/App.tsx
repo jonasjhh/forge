@@ -297,6 +297,16 @@ function App() {
                 </button>
                 <button
                     type="button"
+                    aria-label="Cards"
+                    title="Cards"
+                    aria-pressed={mode === 'cards'}
+                    onClick={() => setMode('cards')}
+                >
+                    <LayoutDashboard size={16} />
+                    <span className="view-label">Cards</span>
+                </button>
+                <button
+                    type="button"
                     aria-label="Graph"
                     title="Graph"
                     aria-pressed={mode === 'graph'}
@@ -324,16 +334,6 @@ function App() {
                 >
                     <Tags size={16} />
                     <span className="view-label">Labels</span>
-                </button>
-                <button
-                    type="button"
-                    aria-label="Cards"
-                    title="Cards"
-                    aria-pressed={mode === 'cards'}
-                    onClick={() => setMode('cards')}
-                >
-                    <LayoutDashboard size={16} />
-                    <span className="view-label">Cards</span>
                 </button>
             </div>
             <div className="view-toolbar-actions">
