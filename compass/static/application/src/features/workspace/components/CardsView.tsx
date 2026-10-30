@@ -1,6 +1,7 @@
 import React from 'react';
 import AssigneeChip from '../../../components/assignees/AssigneeChip';
 import LabelChip from '../../../components/labels/LabelChip';
+import { goalCategories } from '../model/entries';
 import type { WorkspaceEntry, WorkspaceLabel } from '../../../types/workspace';
 
 interface CardsViewProps {
@@ -40,6 +41,12 @@ export default function CardsView({ items, labels, selectedId, onSelect }: Cards
         .map((id) => itemsById.get(id))
         .filter((item): item is WorkspaceEntry => Boolean(item));
     const subGoals = children.filter((item) => item.type === 'goal');
+    const subGoalsByCategory = goalCategories
+        .map((category) => ({
+            category,
+            goals: subGoals.filter((goal) => (goal.goalCategory ?? 'Delivery') === category)
+        }))
+        .filter(({ goals }) => goals.length > 0);
     const metrics = children.filter((item) => item.type === 'metric');
 
     return (
@@ -106,11 +113,22 @@ export default function CardsView({ items, labels, selectedId, onSelect }: Cards
                         )}
                         {subGoals.length > 0 && (
                             <CardSection title="Sub-goals">
-                                <ul className="delivery-card-relations">
-                                    {subGoals.map((goal) => (
-                                        <li key={goal.id}>{goal.name}</li>
+                                <div className="delivery-subgoal-groups">
+                                    {subGoalsByCategory.map(({ category, goals }) => (
+                                        <section
+                                            key={category}
+                                            className="delivery-subgoal-group"
+                                            data-subgoal-category={category}
+                                        >
+                                            <h4>{category}</h4>
+                                            <ul className="delivery-card-relations">
+                                                {goals.map((goal) => (
+                                                    <li key={goal.id}>{goal.name}</li>
+                                                ))}
+                                            </ul>
+                                        </section>
                                     ))}
-                                </ul>
+                                </div>
                             </CardSection>
                         )}
                         {metrics.length > 0 && (

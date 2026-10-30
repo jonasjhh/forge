@@ -873,6 +873,16 @@
     display: grid;
     gap: 7px;
 }
+.delivery-subgoal-groups {
+    display: grid;
+    gap: 12px;
+}
+.delivery-subgoal-group h4 {
+    margin-bottom: 5px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+}
 .delivery-card-relations li,
 .delivery-card-metrics li {
     min-width: 0;

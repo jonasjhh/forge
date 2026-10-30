@@ -922,7 +922,7 @@ test('given the Cards tab, deliveries show only existing fields and related work
             type: 'goal',
             name: 'Improve digital process',
             description: 'Users complete the process without duplicate registration.',
-            childIds: ['metric', 'sub-delivery'],
+            childIds: ['metric', 'sub-decision', 'sub-capability', 'sub-delivery'],
             assignees: [{ accountId: 'owner-1', displayName: 'Alex Morgan' }],
             labelIds: ['program'],
             goalCategory: 'Delivery'
@@ -934,6 +934,18 @@ test('given the Cards tab, deliveries show only existing fields and related work
             currentValue: 20,
             targetValue: 70,
             unit: '%'
+        }),
+        entryFixture({
+            id: 'sub-decision',
+            type: 'goal',
+            name: 'Approve exception handling',
+            goalCategory: 'Decision'
+        }),
+        entryFixture({
+            id: 'sub-capability',
+            type: 'goal',
+            name: 'Validate structured input',
+            goalCategory: 'Capability'
         }),
         entryFixture({
             id: 'sub-delivery',
@@ -971,6 +983,17 @@ test('given the Cards tab, deliveries show only existing fields and related work
     expect(container.querySelector('.delivery-card')?.textContent).toContain('Program OKR');
     expect(container.querySelector('.delivery-card')?.textContent).toContain('Objective');
     expect(container.querySelector('.delivery-card')?.textContent).toContain('Automate intake');
+    expect(
+        [...container.querySelectorAll<HTMLElement>('.delivery-subgoal-group')].map(
+            (group) => group.dataset.subgoalCategory
+        )
+    ).toEqual(['Decision', 'Capability', 'Delivery']);
+    expect(container.querySelector('.delivery-card')?.textContent).toContain(
+        'Approve exception handling'
+    );
+    expect(container.querySelector('.delivery-card')?.textContent).toContain(
+        'Validate structured input'
+    );
     expect(container.querySelector('.delivery-card')?.textContent).toContain('20 / 70 %');
     expect(container.querySelector('.delivery-card')?.textContent).not.toContain('Status');
     expect(container.querySelector('.delivery-card')?.textContent).not.toContain('Risk');
