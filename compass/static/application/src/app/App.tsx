@@ -491,10 +491,10 @@ function App() {
             )}
             <div
                 ref={workspaceRef}
-                className={`workspace ${selected ? 'has-selection' : ''} mode-${mode}`}
+                className={`workspace ${selected && mode !== 'cards' ? 'has-selection' : ''} mode-${mode}`}
                 style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
             >
-                {selected && (
+                {selected && mode !== 'cards' && (
                     <button
                         type="button"
                         className="sidebar-resizer"

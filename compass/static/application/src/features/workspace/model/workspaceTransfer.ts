@@ -1,5 +1,5 @@
-import { canContain, goalCategories } from './entries';
-import type { Graph, WorkspaceEntry, WorkspaceLabel } from '../../../types/workspace';
+import { canContain, goalCategories, goalStatuses } from './entries';
+import type { GoalStatus, Graph, WorkspaceEntry, WorkspaceLabel } from '../../../types/workspace';
 
 function requireValid(condition: unknown, message: string): asserts condition {
     if (!condition) throw new Error(message);
@@ -97,6 +97,12 @@ function validateEntry(value: unknown): asserts value is WorkspaceEntry {
             value.goalCategory === undefined ||
                 goalCategories.some((category) => category === value.goalCategory),
             'Invalid goal category.'
+        );
+        requireValid(
+            value.status === undefined ||
+                (typeof value.status === 'string' &&
+                    goalStatuses.includes(value.status as GoalStatus)),
+            'Goals must use green, yellow, or red status.'
         );
         requireValid(
             value.targetDate === undefined ||

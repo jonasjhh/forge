@@ -1,12 +1,14 @@
 import type {
     Assignee,
     GoalCategory,
+    GoalStatus,
     Graph,
     WorkspaceEntry,
     WorkspaceLabel
 } from '../../shared/workspace';
 
 const goalCategories: GoalCategory[] = ['Decision', 'Capability', 'Delivery'];
+const goalStatuses: GoalStatus[] = ['green', 'yellow', 'red'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null;
@@ -66,6 +68,14 @@ export function validateGraph(payload: unknown): Graph {
                 !goalCategories.includes(goalCategory as GoalCategory))
         ) {
             throw new Error('Goals must use Decision, Capability, or Delivery as their category.');
+        }
+        const status = type === 'goal' ? item.status : undefined;
+        if (
+            type === 'goal' &&
+            status !== undefined &&
+            !goalStatuses.includes(status as GoalStatus)
+        ) {
+            throw new Error('Goals must use green, yellow, or red status.');
         }
         const targetDate =
             type === 'goal' && typeof item.targetDate === 'string' ? item.targetDate : undefined;
@@ -168,6 +178,7 @@ export function validateGraph(payload: unknown): Graph {
             ...(type === 'goal'
                 ? {
                       goalCategory: goalCategory as GoalCategory,
+                      ...(status ? { status: status as GoalStatus } : {}),
                       ...(targetDate ? { targetDate } : {})
                   }
                 : {}),

@@ -306,6 +306,14 @@
     padding-left: 3px;
     padding-right: 3px;
 }
+.goal-table .column-target-month {
+    white-space: nowrap;
+}
+.goal-table .column-target-month time {
+    color: var(--muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
 .column-heading-icon {
     display: inline-flex;
     align-items: center;
@@ -831,6 +839,44 @@
     font-weight: 700;
     text-transform: uppercase;
 }
+.delivery-card-header-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+}
+.delivery-card-header-meta .delivery-card-eyebrow {
+    margin: 0;
+}
+.goal-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.goal-status-undefined {
+    background: #e9ebef;
+    color: #626f86;
+}
+.goal-status-green {
+    background: #dcfff1;
+    color: #216e4e;
+}
+.goal-status-yellow {
+    background: #fff1c2;
+    color: #946f00;
+}
+.goal-status-red {
+    background: #ffebe6;
+    color: #ae2a19;
+}
 .delivery-card-header h2 {
     font-size: 20px;
     line-height: 1.3;
@@ -842,6 +888,24 @@
     line-height: 1.5;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+}
+.delivery-card-target-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 20px;
+    border-bottom: 1px solid var(--line);
+    background: var(--subtle);
+    font-size: 12px;
+}
+.delivery-card-target-row > span:first-child {
+    color: var(--muted);
+    font-weight: 600;
+}
+.delivery-card-target-row time {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
 }
 .delivery-card-content {
     display: grid;
@@ -1491,6 +1555,10 @@ select:focus {
     }
     .delivery-card-header {
         padding: 14px;
+    }
+    .delivery-card-target-row {
+        padding-right: 14px;
+        padding-left: 14px;
     }
     .details {
         display: block;

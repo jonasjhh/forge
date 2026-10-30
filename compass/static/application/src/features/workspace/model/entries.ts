@@ -17,6 +17,7 @@ export const entryTypes: Record<
 };
 
 export const goalCategories = ['Decision', 'Capability', 'Delivery'] as const;
+export const goalStatuses = ['green', 'yellow', 'red'] as const;
 export const goalCategoryStyles: Record<GoalCategory, { color: string; border: string }> = {
     Decision: { color: '#fff1ef', border: '#ae2a19' },
     Capability: { color: '#dcfff1', border: '#216e4e' },

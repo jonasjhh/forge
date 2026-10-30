@@ -48,6 +48,17 @@ test('given a 200-character name, the graph accepts it and rejects longer names'
     );
 });
 
+test('given a goal status, the graph preserves supported values and rejects unknown values', () => {
+    for (const status of ['green', 'yellow', 'red'] as const) {
+        const graph = validateGraph({ items: [{ ...item('goal', [], 'goal'), status }] });
+        assert.equal(graph.items[0].status, status);
+    }
+    assert.throws(
+        () => validateGraph({ items: [{ ...item('goal', [], 'goal'), status: 'blue' }] }),
+        /green, yellow, or red/
+    );
+});
+
 test('given a goal target month, the graph stores a valid year and month', () => {
     const graph = validateGraph({
         items: [{ ...item('goal', [], 'goal'), targetDate: '2027-03' }]

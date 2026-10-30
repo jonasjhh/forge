@@ -5,12 +5,14 @@ import AssigneePicker from '../../../components/assignees/AssigneePicker';
 import LabelPicker from '../../../components/labels/LabelPicker';
 import MetricFields from './MetricFields';
 import type { MetricValues } from './MetricFields';
+import { GoalStatusField } from './GoalStatus';
 import { canContain, entryTypes, goalCategories } from '../model/entries';
 import type {
     Assignee,
     EntryDraft,
     EntryType,
     GoalCategory,
+    GoalStatus,
     WorkspaceEntry,
     WorkspaceLabel
 } from '../../../types/workspace';
@@ -50,6 +52,7 @@ export default function EntryDialog({
     const [assignees, setAssignees] = useState<Assignee[]>([]);
     const [labelIds, setLabelIds] = useState<string[]>([]);
     const [goalCategory, setGoalCategory] = useState<GoalCategory>('Delivery');
+    const [status, setStatus] = useState<GoalStatus | ''>('');
     const [targetDate, setTargetDate] = useState('');
     const [metric, setMetric] = useState<MetricValues>({
         currentValue: 0,
@@ -94,7 +97,11 @@ export default function EntryDialog({
                                 assignees: type === 'group' ? [] : assignees,
                                 labelIds,
                                 ...(type === 'goal'
-                                    ? { goalCategory, ...(targetDate ? { targetDate } : {}) }
+                                    ? {
+                                          goalCategory,
+                                          ...(status ? { status } : {}),
+                                          ...(targetDate ? { targetDate } : {})
+                                      }
                                     : {}),
                                 ...(type === 'metric' ? metric : {})
                             },
@@ -166,6 +173,12 @@ export default function EntryDialog({
                                         </option>
                                     ))}
                                 </select>
+                                <GoalStatusField
+                                    id="new-goal-status"
+                                    value={status}
+                                    disabled={busy}
+                                    onChange={setStatus}
+                                />
                                 <label htmlFor="new-target-date">
                                     Target month <span className="optional">optional</span>
                                 </label>

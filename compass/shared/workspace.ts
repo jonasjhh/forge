@@ -1,5 +1,6 @@
 export type EntryType = 'group' | 'goal' | 'metric';
 export type GoalCategory = 'Decision' | 'Capability' | 'Delivery';
+export type GoalStatus = 'green' | 'yellow' | 'red';
 
 export interface Assignee {
     accountId: string;
@@ -22,6 +23,7 @@ export interface WorkspaceEntry {
     assignees: Assignee[];
     labelIds: string[];
     goalCategory?: GoalCategory;
+    status?: GoalStatus;
     targetDate?: string;
     currentValue?: number | null;
     targetValue?: number | null;

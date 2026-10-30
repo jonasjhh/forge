@@ -1,16 +1,10 @@
 import React from 'react';
 import AssigneeChip from '../../../components/assignees/AssigneeChip';
 import LabelChip from '../../../components/labels/LabelChip';
+import { GoalStatusBadge } from './GoalStatus';
 import { goalCategoryStyles } from '../model/entries';
+import { formatTargetMonth } from '../model/targetMonth';
 import type { GoalCategory, WorkspaceEntry, WorkspaceLabel } from '../../../types/workspace';
-
-function formatTargetMonth(value: string): string {
-    return new Intl.DateTimeFormat(undefined, {
-        month: 'long',
-        year: 'numeric',
-        timeZone: 'UTC'
-    }).format(new Date(`${value}-01T00:00:00.000Z`));
-}
 
 interface CardsViewProps {
     items: WorkspaceEntry[];
@@ -90,16 +84,24 @@ export default function CardsView({ items, labels, selectedId, onSelect }: Cards
             {selected ? (
                 <article className="delivery-card" aria-label="Delivery details">
                     <header className="delivery-card-header">
-                        <span className="delivery-card-eyebrow">Delivery</span>
+                        <div className="delivery-card-header-meta">
+                            <span className="delivery-card-eyebrow">Delivery</span>
+                            <GoalStatusBadge status={selected.status} />
+                        </div>
                         <h2>{selected.name}</h2>
-                        {selected.targetDate && (
-                            <p className="delivery-card-target-date">
-                                Target month: {formatTargetMonth(selected.targetDate)}
-                            </p>
-                        )}
                         {selected.description && <p>{selected.description}</p>}
                     </header>
                     <div className="delivery-card-content">
+                        <div className="delivery-card-target-row">
+                            <span>Target month</span>
+                            {selected.targetDate ? (
+                                <time dateTime={`${selected.targetDate}-01`}>
+                                    {formatTargetMonth(selected.targetDate)}
+                                </time>
+                            ) : (
+                                <span className="muted">Not set</span>
+                            )}
+                        </div>
                         {selected.assignees.length > 0 && (
                             <CardSection title="Assignees">
                                 <div className="delivery-card-assignees">

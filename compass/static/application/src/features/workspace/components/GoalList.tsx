@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import {
     ChevronRight,
+    CalendarDays,
     Folder as GroupIcon,
     Gauge,
     GitBranch,
@@ -27,6 +28,7 @@ import AssigneeChip from '../../../components/assignees/AssigneeChip';
 import LabelChip from '../../../components/labels/LabelChip';
 import IconButton from '../../../components/ui/IconButton';
 import DraggableListRow from './DraggableListRow';
+import { formatTargetMonth } from '../model/targetMonth';
 import type { CollisionDetection, DragEndEvent } from '@dnd-kit/core';
 import type { DragEntryData, DropTargetData } from './DraggableListRow';
 import type { DropPlacement, WorkspaceEntry, WorkspaceLabel } from '../../../types/workspace';
@@ -40,12 +42,13 @@ const goalCategoryIcons = {
 const columns = [
     { label: 'Name', className: 'column-name' },
     { label: 'Assignees', className: 'column-assignees' },
+    { label: 'Target month', className: 'column-target-month', icon: CalendarDays },
     { label: 'Labels', className: 'column-labels' },
     { label: 'Parent goals', className: 'column-parents', icon: GitBranch },
     { label: 'Metrics', className: 'column-metrics', icon: Gauge }
 ];
-const minimumColumnWidths = [24, 12, 12, 5, 5];
-const initialColumnWidths = [48, 21, 21, 5, 5];
+const minimumColumnWidths = [24, 12, 12, 12, 5, 5];
+const initialColumnWidths = [42, 18, 12, 18, 5, 5];
 
 function resizeColumnPair(widths: number[], index: number, amount: number): number[] {
     const pairWidth = widths[index] + widths[index + 1];
@@ -477,6 +480,18 @@ export default function GoalList({
                                                         </span>
                                                     )}
                                                 </div>
+                                            </td>
+                                            <td className="column-target-month">
+                                                {entry.type === 'goal' && entry.targetDate ? (
+                                                    <time dateTime={`${entry.targetDate}-01`}>
+                                                        {formatTargetMonth(
+                                                            entry.targetDate,
+                                                            'short'
+                                                        )}
+                                                    </time>
+                                                ) : (
+                                                    <span className="muted">-</span>
+                                                )}
                                             </td>
                                             <td className="column-labels">
                                                 <div className="table-labels">

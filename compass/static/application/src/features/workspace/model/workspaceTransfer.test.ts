@@ -30,6 +30,7 @@ const graph: Graph = {
             assignees: [{ accountId: 'alice', displayName: 'Alice' }],
             labelIds: ['team'],
             goalCategory: 'Decision',
+            status: 'yellow',
             targetDate: '2027-03'
         }
     ],
@@ -53,6 +54,7 @@ test.each([
     { ...graph.items[0], childIds: ['shared', 'shared'] },
     { ...graph.items[0], labelIds: ['unknown'] },
     { ...graph.items[0], targetDate: '2027-13' },
+    { ...graph.items[0], status: 'blue' },
     { ...graph.items[0], name: 'x'.repeat(201) },
     { ...graph.items[0], type: 'unknown' },
     { ...graph.items[0], assignees: [{ displayName: 'Alice' }] }

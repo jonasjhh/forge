@@ -4,6 +4,7 @@ export type {
     EntryDraft,
     EntryType,
     GoalCategory,
+    GoalStatus,
     Graph,
     ListRow,
     SavedGraph,

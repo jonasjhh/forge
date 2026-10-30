@@ -17,10 +17,12 @@ import AssigneePicker from '../../../components/assignees/AssigneePicker';
 import LabelPicker from '../../../components/labels/LabelPicker';
 import LabelChip from '../../../components/labels/LabelChip';
 import MetricFields from './MetricFields';
+import { GoalStatusField } from './GoalStatus';
 import { canConnect, entryTypes, goalCategories } from '../model/entries';
 import type {
     EntryType,
     GoalCategory,
+    GoalStatus,
     WorkspaceEntry,
     WorkspaceLabel
 } from '../../../types/workspace';
@@ -63,6 +65,7 @@ export default function EntryDetails({
     const [assignees, setAssignees] = useState(item.assignees);
     const [labelIds, setLabelIds] = useState(item.labelIds ?? []);
     const [goalCategory, setGoalCategory] = useState<GoalCategory>(item.goalCategory ?? 'Delivery');
+    const [status, setStatus] = useState<GoalStatus | ''>(item.status ?? '');
     const [targetDate, setTargetDate] = useState(item.targetDate ?? '');
     const [metric, setMetric] = useState({
         currentValue: item.currentValue ?? null,
@@ -77,6 +80,7 @@ export default function EntryDetails({
         setAssignees(item.assignees);
         setLabelIds(item.labelIds ?? []);
         setGoalCategory(item.goalCategory ?? 'Delivery');
+        setStatus(item.status ?? '');
         setTargetDate(item.targetDate ?? '');
         setMetric({
             currentValue: item.currentValue ?? null,
@@ -110,7 +114,13 @@ export default function EntryDetails({
         description,
         assignees,
         labelIds,
-        ...(item.type === 'goal' ? { goalCategory, ...(targetDate ? { targetDate } : {}) } : {}),
+        ...(item.type === 'goal'
+            ? {
+                  goalCategory,
+                  ...(status ? { status } : {}),
+                  ...(targetDate ? { targetDate } : {})
+              }
+            : {}),
         ...(item.type === 'metric' ? metric : {})
     };
     const changed = JSON.stringify(draft) !== JSON.stringify(item) || groupId !== currentGroupId;
@@ -202,6 +212,12 @@ export default function EntryDetails({
                                 </option>
                             ))}
                         </select>
+                        <GoalStatusField
+                            id="goal-status"
+                            value={status}
+                            disabled={busy}
+                            onChange={setStatus}
+                        />
                         <label htmlFor="goal-target-date">
                             Target month <span className="optional">optional</span>
                         </label>
