@@ -117,8 +117,8 @@ export default function EntryDetails({
         ...(item.type === 'goal'
             ? {
                   goalCategory,
-                  ...(status ? { status } : {}),
-                  ...(targetDate ? { targetDate } : {})
+                  status: status || undefined,
+                  targetDate: targetDate || undefined
               }
             : {}),
         ...(item.type === 'metric' ? metric : {})

@@ -285,6 +285,17 @@ test('given a goal category, creating and changing it updates the list label and
     expect(typeFilter.querySelector('input[value="Decision"]')).not.toBeNull();
     expect(typeFilter.querySelector('input[value="Capability"]')).not.toBeNull();
     expect(typeFilter.querySelector('input[value="Delivery"]')).not.toBeNull();
+
+    act(() => {
+        changeValue(required(container.querySelector('#goal-status')), '');
+        changeValue(required(container.querySelector('#goal-target-date')), '');
+    });
+    await act(async () => {
+        Simulate.submit(required(container.querySelector('.details form')));
+    });
+    const cleared = required(savedGraph().items.find((item) => item.id === 'created-entry'));
+    expect(cleared.status).toBeUndefined();
+    expect(cleared.targetDate).toBeUndefined();
 });
 
 test('given an open edit sidebar, closing it clears selection and allows reopening', async () => {
