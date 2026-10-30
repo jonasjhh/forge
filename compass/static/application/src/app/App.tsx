@@ -68,7 +68,7 @@ function App() {
     const [items, setItems] = useState<WorkspaceEntry[]>([]);
     const [labels, setLabels] = useState<WorkspaceLabel[]>([]);
     const [selectedId, setSelectedId] = useState<string | null>(null);
-    const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null);
+    const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
     const [focusByView, setFocusByView] = useState<Record<RelationshipViewMode, string | null>>({
         graph: null,
         tree: null
@@ -134,12 +134,13 @@ function App() {
     }, [reload]);
 
     useEffect(() => {
-        const availableDeliveries = items.filter(
-            (item) => item.type === 'goal' && (item.goalCategory ?? 'Delivery') === 'Delivery'
+        const availableGoals = items.filter((item) => item.type === 'goal');
+        if (availableGoals.some((goal) => goal.id === selectedCardId)) return;
+        const firstDelivery = availableGoals.find(
+            (goal) => (goal.goalCategory ?? 'Delivery') === 'Delivery'
         );
-        if (availableDeliveries.some((delivery) => delivery.id === selectedDeliveryId)) return;
-        setSelectedDeliveryId(availableDeliveries[0]?.id ?? null);
-    }, [items, selectedDeliveryId]);
+        setSelectedCardId(firstDelivery?.id ?? null);
+    }, [items, selectedCardId]);
 
     async function save(
         nextItems: WorkspaceEntry[],
@@ -585,8 +586,8 @@ function App() {
                         <CardsView
                             items={items}
                             labels={labels}
-                            selectedId={selectedDeliveryId}
-                            onSelect={setSelectedDeliveryId}
+                            selectedId={selectedCardId}
+                            onSelect={setSelectedCardId}
                         />
                     ) : mode === 'list' ? (
                         <div className="list-workspace">

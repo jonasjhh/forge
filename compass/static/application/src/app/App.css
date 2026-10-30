@@ -301,10 +301,16 @@
     opacity: 1;
 }
 .goal-table .column-parents,
-.goal-table .column-metrics {
+.goal-table .column-metrics,
+.goal-table .column-status {
     text-align: center;
     padding-left: 3px;
     padding-right: 3px;
+}
+.goal-table .column-status .goal-status-badge {
+    min-height: 22px;
+    padding: 3px 6px;
+    font-size: 10px;
 }
 .goal-table .column-target-month {
     white-space: nowrap;
@@ -939,12 +945,46 @@
 .delivery-goal-column .delivery-card-relations {
     gap: 8px;
 }
-.delivery-goal-column .delivery-card-relations li {
-    padding-left: 8px;
-    border-left: 2px solid color-mix(in srgb, var(--goal-category-color) 50%, white);
+.delivery-subgoal-card,
+.delivery-parent-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid color-mix(in srgb, var(--goal-category-color, var(--line)) 35%, white);
+    border-radius: 4px;
+    background: var(--white);
+    color: var(--text);
+    text-align: left;
 }
-.delivery-goal-column .is-selected-delivery {
-    font-weight: 700;
+.delivery-subgoal-card:hover,
+.delivery-parent-card:hover {
+    border-color: var(--goal-category-color, var(--blue));
+    background: var(--goal-category-background, var(--subtle));
+}
+.delivery-subgoal-name,
+.delivery-parent-name {
+    min-width: 0;
+    flex: 1;
+    overflow-wrap: anywhere;
+}
+.delivery-parent-cards {
+    display: grid;
+    gap: 8px;
+}
+.delivery-parent-category {
+    flex: none;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 600;
+}
+.delivery-subgoal-card .goal-status-badge,
+.delivery-parent-card .goal-status-badge {
+    flex: none;
+    padding: 3px 6px;
+    font-size: 10px;
 }
 .delivery-category-empty {
     color: var(--muted);

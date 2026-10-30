@@ -28,7 +28,8 @@ export default function CardsView({ items, labels, selectedId, onSelect }: Cards
     const deliveries = items.filter(
         (item) => item.type === 'goal' && (item.goalCategory ?? 'Delivery') === 'Delivery'
     );
-    const selected = deliveries.find((delivery) => delivery.id === selectedId) ?? deliveries[0];
+    const goals = items.filter((item) => item.type === 'goal');
+    const selected = goals.find((goal) => goal.id === selectedId) ?? deliveries[0];
     const itemsById = new Map(items.map((item) => [item.id, item]));
     const selectedLabels = (selected?.labelIds ?? [])
         .map((id) => labels.find((label) => label.id === id))
@@ -45,12 +46,9 @@ export default function CardsView({ items, labels, selectedId, onSelect }: Cards
         .map((id) => itemsById.get(id))
         .filter((item): item is WorkspaceEntry => Boolean(item));
     const subGoals = children.filter((item) => item.type === 'goal');
-    const relatedGoals = selected
-        ? [...new Map([...parents, ...subGoals].map((goal) => [goal.id, goal])).values()]
-        : [];
     const goalsByCategory = cardGoalCategories.map((category) => ({
         category,
-        goals: relatedGoals.filter((goal) => (goal.goalCategory ?? 'Delivery') === category)
+        goals: subGoals.filter((goal) => (goal.goalCategory ?? 'Delivery') === category)
     }));
     const metrics = children.filter((item) => item.type === 'metric');
 
@@ -111,6 +109,30 @@ export default function CardsView({ items, labels, selectedId, onSelect }: Cards
                                 </div>
                             </CardSection>
                         )}
+                        {parents.length > 0 && (
+                            <CardSection
+                                title={parents.length === 1 ? 'Parent goal' : 'Parent goals'}
+                            >
+                                <div className="delivery-parent-cards">
+                                    {parents.map((parent) => (
+                                        <button
+                                            key={parent.id}
+                                            type="button"
+                                            className="delivery-parent-card"
+                                            onClick={() => onSelect(parent.id)}
+                                        >
+                                            <span className="delivery-parent-category">
+                                                {parent.goalCategory ?? 'Delivery'}
+                                            </span>
+                                            <span className="delivery-parent-name">
+                                                {parent.name}
+                                            </span>
+                                            <GoalStatusBadge status={parent.status} />
+                                        </button>
+                                    ))}
+                                </div>
+                            </CardSection>
+                        )}
                         <div className="delivery-goal-grid" aria-label="Related goals by category">
                             {goalsByCategory.map(({ category, goals }) => (
                                 <section
@@ -130,15 +152,18 @@ export default function CardsView({ items, labels, selectedId, onSelect }: Cards
                                     {goals.length ? (
                                         <ul className="delivery-card-relations">
                                             {goals.map((goal) => (
-                                                <li
-                                                    key={goal.id}
-                                                    className={
-                                                        goal.id === selected.id
-                                                            ? 'is-selected-delivery'
-                                                            : ''
-                                                    }
-                                                >
-                                                    {goal.name}
+                                                <li key={goal.id}>
+                                                    <button
+                                                        type="button"
+                                                        className="delivery-subgoal-card"
+                                                        aria-label={`Open ${goal.goalCategory ?? 'Delivery'} sub-goal ${goal.name}`}
+                                                        onClick={() => onSelect(goal.id)}
+                                                    >
+                                                        <span className="delivery-subgoal-name">
+                                                            {goal.name}
+                                                        </span>
+                                                        <GoalStatusBadge status={goal.status} />
+                                                    </button>
                                                 </li>
                                             ))}
                                         </ul>

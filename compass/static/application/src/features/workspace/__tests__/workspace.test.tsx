@@ -954,19 +954,22 @@ test('given the Cards tab, deliveries show only existing fields and related work
             id: 'sub-decision',
             type: 'goal',
             name: 'Approve exception handling',
-            goalCategory: 'Decision'
+            goalCategory: 'Decision',
+            status: 'green'
         }),
         entryFixture({
             id: 'sub-capability',
             type: 'goal',
             name: 'Validate structured input',
-            goalCategory: 'Capability'
+            goalCategory: 'Capability',
+            status: 'yellow'
         }),
         entryFixture({
             id: 'sub-delivery',
             type: 'goal',
             name: 'Automate intake',
-            goalCategory: 'Delivery'
+            goalCategory: 'Delivery',
+            status: 'red'
         }),
         entryFixture({
             id: 'sibling',
@@ -1033,10 +1036,22 @@ test('given the Cards tab, deliveries show only existing fields and related work
     expect(container.querySelector('.delivery-goal-delivery')?.textContent).not.toContain(
         'Improve digital process'
     );
-    expect(container.querySelector('.delivery-goal-decision')?.textContent).toContain('Objective');
+    expect(container.querySelector('.delivery-parent-card')?.textContent).toContain('Objective');
     expect(container.querySelector('.delivery-goal-decision')?.textContent).toContain(
         'Approve exception handling'
     );
+    expect(container.querySelectorAll('.delivery-subgoal-card')).toHaveLength(3);
+    expect(
+        container.querySelector('.delivery-goal-decision .delivery-subgoal-card .goal-status-green')
+    ).not.toBeNull();
+    expect(
+        container.querySelector(
+            '.delivery-goal-capability .delivery-subgoal-card .goal-status-yellow'
+        )
+    ).not.toBeNull();
+    expect(
+        container.querySelector('.delivery-goal-delivery .delivery-subgoal-card .goal-status-red')
+    ).not.toBeNull();
     expect(container.querySelector('.delivery-card')?.textContent).toContain(
         'Approve exception handling'
     );
@@ -1056,6 +1071,27 @@ test('given the Cards tab, deliveries show only existing fields and related work
     act(() =>
         Simulate.click(
             required(
+                container.querySelector(
+                    '[aria-label="Open Capability sub-goal Validate structured input"]'
+                )
+            )
+        )
+    );
+    expect(container.querySelector('.delivery-card-header h2')?.textContent).toBe(
+        'Validate structured input'
+    );
+    const parentCard = required(
+        container.querySelector<HTMLButtonElement>('.delivery-parent-card')
+    );
+    expect(parentCard.textContent).toContain('Improve digital process');
+    act(() => Simulate.click(parentCard));
+    expect(container.querySelector('.delivery-card-header h2')?.textContent).toBe(
+        'Improve digital process'
+    );
+
+    act(() =>
+        Simulate.click(
+            required(
                 [...container.querySelectorAll<HTMLButtonElement>('.delivery-list-item')].find(
                     (button) => button.textContent === 'Automate intake'
                 )
@@ -1065,10 +1101,17 @@ test('given the Cards tab, deliveries show only existing fields and related work
     expect(container.querySelector('.delivery-card-header h2')?.textContent).toBe(
         'Automate intake'
     );
-    expect(container.querySelector('.delivery-card .goal-status-badge')?.textContent).toBe(
-        'Undefined'
+    expect(
+        container.querySelector('.delivery-card-header-meta .goal-status-badge')?.textContent
+    ).toBe('Red');
+    expect(container.querySelector('.delivery-card-header-meta .goal-status-red')).not.toBeNull();
+    expect(container.querySelector('.delivery-parent-card')?.textContent).toContain(
+        'Improve digital process'
     );
-    expect(container.querySelector('.delivery-card .goal-status-undefined')).not.toBeNull();
+    act(() => Simulate.click(required(container.querySelector('.delivery-parent-card'))));
+    expect(container.querySelector('.delivery-card-header h2')?.textContent).toBe(
+        'Improve digital process'
+    );
     expect(savedGraph().items).toEqual(items);
 });
 
@@ -1609,7 +1652,8 @@ test('given compact list rows, type icons replace subtitles and metric values re
             type: 'goal',
             name: 'Delivery goal',
             childIds: ['metric'],
-            targetDate: '2027-03'
+            targetDate: '2027-03',
+            status: 'yellow'
         }),
         entryFixture({
             id: 'capability',
@@ -1649,6 +1693,9 @@ test('given compact list rows, type icons replace subtitles and metric values re
             ?.getAttribute('aria-label')
     ).toBe('Delivery');
     expect(
+        container.querySelector('[data-entry-id="delivery"] .column-status .goal-status-yellow')
+    ).not.toBeNull();
+    expect(
         container.querySelector('[data-entry-id="delivery"] .column-target-month time')?.textContent
     ).toBe('Mar 2027');
     expect(
@@ -1656,9 +1703,12 @@ test('given compact list rows, type icons replace subtitles and metric values re
             .querySelector('[data-entry-id="delivery"] .column-target-month time')
             ?.getAttribute('dateTime')
     ).toBe('2027-03-01');
+    expect(container.querySelector<HTMLTableColElement>('col.column-status')?.style.width).toBe(
+        '10%'
+    );
     expect(
         container.querySelector<HTMLTableColElement>('col.column-target-month')?.style.width
-    ).toBe('12%');
+    ).toBe('9%');
     const columns = [
         ...container.querySelectorAll<HTMLTableCellElement>('.goal-table thead th')
     ].map(
@@ -1666,7 +1716,8 @@ test('given compact list rows, type icons replace subtitles and metric values re
             header.querySelector<HTMLElement>('.column-heading-icon')?.getAttribute('aria-label') ||
             header.textContent?.trim()
     );
-    expect(columns.indexOf('Target month')).toBe(columns.indexOf('Assignees') + 1);
+    expect(columns.indexOf('Status')).toBe(columns.indexOf('Assignees') + 1);
+    expect(columns.indexOf('Target month')).toBe(columns.indexOf('Status') + 1);
     expect(columns.indexOf('Labels')).toBe(columns.indexOf('Target month') + 1);
     expect(
         container.querySelector('[data-entry-id="metric"] .metric-progress')?.textContent
@@ -1711,10 +1762,10 @@ test('given a table column resizer, arrow keys adjust the adjacent column widths
     const columns = required(
         container.querySelectorAll<HTMLTableColElement>('#workspace-entry-table col')
     );
-    expect(nameResizer.getAttribute('aria-valuenow')).toBe('42');
+    expect(nameResizer.getAttribute('aria-valuenow')).toBe('40');
     act(() => Simulate.keyDown(nameResizer, { key: 'ArrowRight' }));
-    expect(nameResizer.getAttribute('aria-valuenow')).toBe('44');
-    expect(columns[0].style.width).toBe('44%');
+    expect(nameResizer.getAttribute('aria-valuenow')).toBe('42');
+    expect(columns[0].style.width).toBe('42%');
     expect(columns[1].style.width).toBe('16%');
 });
 
@@ -1751,8 +1802,8 @@ test('given a table column resizer, pointer dragging adjusts adjacent column wid
     const columns = required(
         container.querySelectorAll<HTMLTableColElement>('#workspace-entry-table col')
     );
-    expect(nameResizer.getAttribute('aria-valuenow')).toBe('45');
-    expect(columns[0].style.width).toBe('45%');
+    expect(nameResizer.getAttribute('aria-valuenow')).toBe('43');
+    expect(columns[0].style.width).toBe('43%');
     expect(columns[1].style.width).toBe('15%');
 });
 
