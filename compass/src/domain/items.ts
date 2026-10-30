@@ -67,6 +67,16 @@ export function validateGraph(payload: unknown): Graph {
         ) {
             throw new Error('Goals must use Decision, Capability, or Delivery as their category.');
         }
+        const targetDate =
+            type === 'goal' && typeof item.targetDate === 'string' ? item.targetDate : undefined;
+        if (
+            type === 'goal' &&
+            item.targetDate !== undefined &&
+            (typeof item.targetDate !== 'string' ||
+                !/^(?!0000)\d{4}-(0[1-9]|1[0-2])$/.test(item.targetDate))
+        ) {
+            throw new Error('Goal target dates must use the YYYY-MM format.');
+        }
         const assignees = item.assignees ?? [];
         if (!Array.isArray(assignees) || assignees.length > 20) {
             throw new Error('Goals and metrics support up to 20 assignees.');
@@ -155,7 +165,12 @@ export function validateGraph(payload: unknown): Graph {
             childIds: [...item.childIds],
             assignees: normalizedAssignees,
             labelIds: [...itemLabelIds] as string[],
-            ...(type === 'goal' ? { goalCategory: goalCategory as GoalCategory } : {}),
+            ...(type === 'goal'
+                ? {
+                      goalCategory: goalCategory as GoalCategory,
+                      ...(targetDate ? { targetDate } : {})
+                  }
+                : {}),
             ...metric
         };
     });

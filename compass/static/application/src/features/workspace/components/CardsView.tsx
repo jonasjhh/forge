@@ -4,6 +4,14 @@ import LabelChip from '../../../components/labels/LabelChip';
 import { goalCategoryStyles } from '../model/entries';
 import type { GoalCategory, WorkspaceEntry, WorkspaceLabel } from '../../../types/workspace';
 
+function formatTargetMonth(value: string): string {
+    return new Intl.DateTimeFormat(undefined, {
+        month: 'long',
+        year: 'numeric',
+        timeZone: 'UTC'
+    }).format(new Date(`${value}-01T00:00:00.000Z`));
+}
+
 interface CardsViewProps {
     items: WorkspaceEntry[];
     labels: WorkspaceLabel[];
@@ -84,6 +92,11 @@ export default function CardsView({ items, labels, selectedId, onSelect }: Cards
                     <header className="delivery-card-header">
                         <span className="delivery-card-eyebrow">Delivery</span>
                         <h2>{selected.name}</h2>
+                        {selected.targetDate && (
+                            <p className="delivery-card-target-date">
+                                Target month: {formatTargetMonth(selected.targetDate)}
+                            </p>
+                        )}
                         {selected.description && <p>{selected.description}</p>}
                     </header>
                     <div className="delivery-card-content">

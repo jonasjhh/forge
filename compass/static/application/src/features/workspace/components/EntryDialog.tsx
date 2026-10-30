@@ -50,6 +50,7 @@ export default function EntryDialog({
     const [assignees, setAssignees] = useState<Assignee[]>([]);
     const [labelIds, setLabelIds] = useState<string[]>([]);
     const [goalCategory, setGoalCategory] = useState<GoalCategory>('Delivery');
+    const [targetDate, setTargetDate] = useState('');
     const [metric, setMetric] = useState<MetricValues>({
         currentValue: 0,
         targetValue: 100,
@@ -92,7 +93,9 @@ export default function EntryDialog({
                                 description,
                                 assignees: type === 'group' ? [] : assignees,
                                 labelIds,
-                                ...(type === 'goal' ? { goalCategory } : {}),
+                                ...(type === 'goal'
+                                    ? { goalCategory, ...(targetDate ? { targetDate } : {}) }
+                                    : {}),
                                 ...(type === 'metric' ? metric : {})
                             },
                             validParentId
@@ -163,6 +166,16 @@ export default function EntryDialog({
                                         </option>
                                     ))}
                                 </select>
+                                <label htmlFor="new-target-date">
+                                    Target month <span className="optional">optional</span>
+                                </label>
+                                <input
+                                    id="new-target-date"
+                                    type="month"
+                                    value={targetDate}
+                                    disabled={busy}
+                                    onChange={(event) => setTargetDate(event.target.value)}
+                                />
                             </React.Fragment>
                         )}
                         <label htmlFor="new-name">Name</label>

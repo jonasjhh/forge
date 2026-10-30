@@ -22,6 +22,7 @@ export interface WorkspaceEntry {
     assignees: Assignee[];
     labelIds: string[];
     goalCategory?: GoalCategory;
+    targetDate?: string;
     currentValue?: number | null;
     targetValue?: number | null;
     unit?: string;

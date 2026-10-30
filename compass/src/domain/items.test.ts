@@ -48,6 +48,36 @@ test('given a 200-character name, the graph accepts it and rejects longer names'
     );
 });
 
+test('given a goal target month, the graph stores a valid year and month', () => {
+    const graph = validateGraph({
+        items: [{ ...item('goal', [], 'goal'), targetDate: '2027-03' }]
+    });
+    assert.equal(graph.items[0].targetDate, '2027-03');
+});
+
+test('given an invalid goal target month, the graph is rejected', () => {
+    assert.throws(
+        () => validateGraph({ items: [{ ...item('goal', [], 'goal'), targetDate: '2027-00' }] }),
+        /YYYY-MM/
+    );
+    assert.throws(
+        () => validateGraph({ items: [{ ...item('goal', [], 'goal'), targetDate: '2027-13' }] }),
+        /YYYY-MM/
+    );
+    assert.throws(
+        () => validateGraph({ items: [{ ...item('goal', [], 'goal'), targetDate: '2027-3' }] }),
+        /YYYY-MM/
+    );
+    assert.throws(
+        () => validateGraph({ items: [{ ...item('goal', [], 'goal'), targetDate: '0000-01' }] }),
+        /YYYY-MM/
+    );
+    assert.throws(
+        () => validateGraph({ items: [{ ...item('goal', [], 'goal'), targetDate: 202703 }] }),
+        /YYYY-MM/
+    );
+});
+
 test('given a self connection, the graph is rejected', () => {
     assert.throws(() => validateGraph({ items: [item('service', ['service'])] }), /cycle/);
 });

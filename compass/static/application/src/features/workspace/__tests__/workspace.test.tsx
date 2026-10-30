@@ -202,17 +202,19 @@ test('given the New goal dialog, fields follow the requested order and parent se
     );
     const dialog = required(container.querySelector('dialog'));
     const fields = dialog.querySelectorAll(
-        '#new-type, #new-goal-category, #new-name, #new-description, #new-assignees, summary[aria-label="Labels"], #new-parent'
+        '#new-type, #new-goal-category, #new-target-date, #new-name, #new-description, #new-assignees, summary[aria-label="Labels"], #new-parent'
     );
     expect([...fields].map((field) => field.id || field.getAttribute('aria-label'))).toEqual([
         'new-type',
         'new-goal-category',
+        'new-target-date',
         'new-name',
         'new-description',
         'new-assignees',
         'Labels',
         'new-parent'
     ]);
+    expect(required(dialog.querySelector<HTMLInputElement>('#new-target-date')).type).toBe('month');
     expect(required(dialog.querySelector<HTMLSelectElement>('#new-parent')).value).toBe('group');
 });
 
@@ -233,6 +235,7 @@ test('given a goal category, creating and changing it updates the list label and
     act(() => {
         changeValue(required(container.querySelector('#new-name')), longGoalName);
         changeValue(required(container.querySelector('#new-goal-category')), 'Capability');
+        changeValue(required(container.querySelector('#new-target-date')), '2027-03');
     });
     await act(async () => {
         Simulate.submit(required(container.querySelector('dialog form')));
@@ -240,6 +243,7 @@ test('given a goal category, creating and changing it updates the list label and
 
     const created = required(savedGraph().items.find((item) => item.id === 'created-entry'));
     expect(created.goalCategory).toBe('Capability');
+    expect(created.targetDate).toBe('2027-03');
     const createdRow = required(container.querySelector('[data-entry-id="created-entry"]'));
     expect(createdRow.querySelector('.goal-row-meta')).toBeNull();
     expect(createdRow.querySelector('.entry-icon-capability')?.getAttribute('aria-label')).toBe(
@@ -252,6 +256,7 @@ test('given a goal category, creating and changing it updates the list label and
             required(container.querySelector(`[aria-label="Open goal ${longGoalName}"]`))
         );
         changeValue(required(container.querySelector('#goal-category')), 'Decision');
+        changeValue(required(container.querySelector('#goal-target-date')), '2028-11');
     });
     await act(async () => {
         Simulate.submit(required(container.querySelector('.details form')));
@@ -259,6 +264,7 @@ test('given a goal category, creating and changing it updates the list label and
 
     const updated = required(savedGraph().items.find((item) => item.id === 'created-entry'));
     expect(updated.goalCategory).toBe('Decision');
+    expect(updated.targetDate).toBe('2028-11');
     const updatedRow = required(container.querySelector('[data-entry-id="created-entry"]'));
     expect(updatedRow.querySelector('.goal-row-meta')).toBeNull();
     expect(updatedRow.querySelector('.entry-icon-decision')?.getAttribute('aria-label')).toBe(
@@ -922,6 +928,7 @@ test('given the Cards tab, deliveries show only existing fields and related work
             type: 'goal',
             name: 'Improve digital process',
             description: 'Users complete the process without duplicate registration.',
+            targetDate: '2027-12',
             childIds: ['metric', 'sub-decision', 'sub-capability', 'sub-delivery'],
             assignees: [{ accountId: 'owner-1', displayName: 'Alex Morgan' }],
             labelIds: ['program'],
@@ -981,8 +988,12 @@ test('given the Cards tab, deliveries show only existing fields and related work
     expect(container.querySelector('.delivery-card-header h2')?.textContent).toBe(
         'Improve digital process'
     );
-    expect(container.querySelector('.delivery-card-header p')?.textContent).toBe(
-        'Users complete the process without duplicate registration.'
+    expect(
+        container.querySelector('.delivery-card-header p:not(.delivery-card-target-date)')
+            ?.textContent
+    ).toBe('Users complete the process without duplicate registration.');
+    expect(container.querySelector('.delivery-card-target-date')?.textContent).toContain(
+        'December 2027'
     );
     expect(container.querySelector('.delivery-card')?.textContent).toContain('Alex Morgan');
     expect(container.querySelector('.delivery-card')?.textContent).toContain('Program OKR');

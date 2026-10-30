@@ -98,6 +98,12 @@ function validateEntry(value: unknown): asserts value is WorkspaceEntry {
                 goalCategories.some((category) => category === value.goalCategory),
             'Invalid goal category.'
         );
+        requireValid(
+            value.targetDate === undefined ||
+                (typeof value.targetDate === 'string' &&
+                    /^(?!0000)\d{4}-(0[1-9]|1[0-2])$/.test(value.targetDate)),
+            'Goal target dates must use the YYYY-MM format.'
+        );
     }
     if (value.type === 'metric') {
         for (const field of ['currentValue', 'targetValue'] as const) {
