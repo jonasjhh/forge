@@ -43,7 +43,7 @@ export interface WorkspaceContext {
 
 export type EntryDraft = Omit<WorkspaceEntry, 'id' | 'childIds'>;
 export type DropPlacement = 'before' | 'inside' | 'after';
-export type ViewMode = 'list' | 'graph' | 'tree' | 'labels';
+export type ViewMode = 'list' | 'graph' | 'tree' | 'labels' | 'cards';
 
 export interface ListRow {
     entry: WorkspaceEntry;

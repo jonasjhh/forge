@@ -161,6 +161,30 @@ test('given a graph, collapsing the toolbar preserves its network and selection'
     expect(container.querySelector('.details')).not.toBeNull();
 });
 
+test.each([499, 500])(
+    'given %i workspace entries, creation buttons follow the 500-entry limit',
+    async (entryCount) => {
+        const items = Array.from({ length: entryCount }, (_, index) =>
+            entryFixture({ id: `goal-${index}`, type: 'goal' })
+        );
+        localStorage.setItem(
+            'compass-preview-v1',
+            JSON.stringify({ items, labels: [], updatedAt: null })
+        );
+        await act(async () => {
+            ReactDOM.render(<App />, container);
+        });
+        const button = (label: string) =>
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+                    (candidate) => candidate.textContent?.trim() === label
+                )
+            );
+        expect(button('New goal').disabled).toBe(entryCount >= 500);
+        expect(button('New group').disabled).toBe(entryCount >= 500);
+    }
+);
+
 test('given the New goal dialog, fields follow the requested order and parent selection remains available', async () => {
     localStorage.setItem(
         'compass-preview-v1',
@@ -776,7 +800,7 @@ test('given an item editor, only existing labels can be assigned', async () => {
     expect(required(savedGraph().items[0]).labelIds).toEqual(['architecture']);
 });
 
-test('given search and filters, graph and tree retain matching item ancestors', async () => {
+test('given list search and type filters, graph and tree remain independent', async () => {
     const items = [
         entryFixture({ id: 'group', childIds: ['parent'] }),
         entryFixture({
@@ -830,21 +854,16 @@ test('given search and filters, graph and tree retain matching item ancestors', 
     const latestNodeIds = () =>
         mockNetwork.mock.calls[mockNetwork.mock.calls.length - 1][1].nodes.map((node) => node.id);
 
-    act(() => {
-        Simulate.click(
-            required(
-                [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].find(
-                    (button) => button.textContent?.trim() === 'Graph'
-                )
-            )
-        );
-    });
     act(() => changeValue(search, 'Child goal'));
-    expect(latestNodeIds()).toEqual(['parent', 'child']);
+    expect(
+        [...container.querySelectorAll<HTMLElement>('.entry-row')].map((row) => row.dataset.entryId)
+    ).toEqual(['group', 'parent', 'child']);
 
     setType('all', false);
     setType('Capability', true);
-    expect(latestNodeIds()).toEqual(['parent', 'child']);
+    expect(
+        [...container.querySelectorAll<HTMLElement>('.entry-row')].map((row) => row.dataset.entryId)
+    ).toEqual(['group', 'parent', 'child']);
 
     act(() => {
         Simulate.click(
@@ -855,11 +874,120 @@ test('given search and filters, graph and tree retain matching item ancestors', 
             )
         );
     });
-    expect(latestNodeIds()).toEqual(['parent', 'child']);
+    expect(latestNodeIds()).toEqual(['parent', 'child', 'metric', 'other']);
+    expect(container.querySelector('.workspace-filters')).toBeNull();
 
+    act(() => {
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].find(
+                    (button) => button.textContent?.trim() === 'Tree'
+                )
+            )
+        );
+    });
+    expect(latestNodeIds()).toEqual(['parent', 'child', 'metric', 'other']);
+    expect(container.querySelector('.workspace-filters')).toBeNull();
+
+    act(() => {
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].find(
+                    (button) => button.textContent?.trim() === 'List'
+                )
+            )
+        );
+    });
+    expect(
+        [...container.querySelectorAll<HTMLElement>('.entry-row')].map((row) => row.dataset.entryId)
+    ).toEqual(['group', 'parent', 'child']);
     setType('all', true);
     act(() => changeValue(search, 'Platform'));
-    expect(latestNodeIds()).toEqual(['parent', 'child', 'metric']);
+    expect(
+        [...container.querySelectorAll<HTMLElement>('.entry-row')].map((row) => row.dataset.entryId)
+    ).toEqual(['group', 'parent', 'child', 'metric']);
+});
+
+test('given the Cards tab, deliveries show only existing fields and related workspace data', async () => {
+    const items = [
+        entryFixture({
+            id: 'objective',
+            type: 'goal',
+            name: 'Objective',
+            childIds: ['delivery', 'sibling'],
+            goalCategory: 'Decision'
+        }),
+        entryFixture({
+            id: 'delivery',
+            type: 'goal',
+            name: 'Improve digital process',
+            description: 'Users complete the process without duplicate registration.',
+            childIds: ['metric', 'sub-delivery'],
+            assignees: [{ accountId: 'owner-1', displayName: 'Alex Morgan' }],
+            labelIds: ['program'],
+            goalCategory: 'Delivery'
+        }),
+        entryFixture({
+            id: 'metric',
+            type: 'metric',
+            name: 'Completion rate',
+            currentValue: 20,
+            targetValue: 70,
+            unit: '%'
+        }),
+        entryFixture({
+            id: 'sub-delivery',
+            type: 'goal',
+            name: 'Automate intake',
+            goalCategory: 'Delivery'
+        }),
+        entryFixture({
+            id: 'sibling',
+            type: 'goal',
+            name: 'Decision: update workflow',
+            goalCategory: 'Decision'
+        })
+    ];
+    const labels = [{ id: 'program', name: 'Program OKR', color: '#0c66e4' }];
+    localStorage.setItem('compass-preview-v1', JSON.stringify({ items, labels, updatedAt: null }));
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    act(() => Simulate.click(required(container.querySelector('[aria-label="Cards"]'))));
+
+    const deliveryList = required(container.querySelector('[aria-label="Deliveries"]'));
+    expect(deliveryList.querySelectorAll('.delivery-list-item')).toHaveLength(2);
+    expect(deliveryList.textContent).not.toContain('Decision: update workflow');
+    expect(container.querySelector('.workspace-filters')).toBeNull();
+    expect(container.querySelector('.details')).toBeNull();
+    expect(container.querySelector('.connection-count')?.textContent).toBe('2 deliveries');
+    expect(container.querySelector('.delivery-card-header h2')?.textContent).toBe(
+        'Improve digital process'
+    );
+    expect(container.querySelector('.delivery-card-header p')?.textContent).toBe(
+        'Users complete the process without duplicate registration.'
+    );
+    expect(container.querySelector('.delivery-card')?.textContent).toContain('Alex Morgan');
+    expect(container.querySelector('.delivery-card')?.textContent).toContain('Program OKR');
+    expect(container.querySelector('.delivery-card')?.textContent).toContain('Objective');
+    expect(container.querySelector('.delivery-card')?.textContent).toContain('Automate intake');
+    expect(container.querySelector('.delivery-card')?.textContent).toContain('20 / 70 %');
+    expect(container.querySelector('.delivery-card')?.textContent).not.toContain('Status');
+    expect(container.querySelector('.delivery-card')?.textContent).not.toContain('Risk');
+
+    act(() =>
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('.delivery-list-item')].find(
+                    (button) => button.textContent === 'Automate intake'
+                )
+            )
+        )
+    );
+    expect(container.querySelector('.delivery-card-header h2')?.textContent).toBe(
+        'Automate intake'
+    );
+    expect(savedGraph().items).toEqual(items);
 });
 
 test('given the assignee filter, selecting people uses OR matching and clear all restores unrelated rows', async () => {
@@ -2105,7 +2233,12 @@ test.each(['Tree', 'Graph'])(
         act(() => {
             Simulate.click(required(container.querySelector('[aria-label="Close sidebar"]')));
         });
-        expect(graphSnapshot().nodes).toHaveLength(6);
+        expect(graphSnapshot().nodes.map((node) => node.id)).toEqual([
+            'first',
+            'child',
+            'metric',
+            'shared'
+        ]);
         expect(mockNetwork).toHaveBeenCalledTimes(1);
         expect(savedGraph().items).toEqual(items);
     }
@@ -2224,11 +2357,12 @@ test.each(['Tree', 'Graph'])(
     }
 );
 
-test('given a selected list row, only its connected items remain and graph inherits the focus', async () => {
+test('given a selected list row, list filters stay local and graph and tree keep independent focus', async () => {
     const items = [
         entryFixture({ id: 'group', name: 'Group', childIds: ['parent', 'other'] }),
         entryFixture({ id: 'parent', type: 'goal', name: 'Parent', childIds: ['child'] }),
-        entryFixture({ id: 'child', type: 'goal', name: 'Child' }),
+        entryFixture({ id: 'child', type: 'goal', name: 'Child', childIds: ['metric'] }),
+        entryFixture({ id: 'metric', type: 'metric', name: 'Metric' }),
         entryFixture({ id: 'other', type: 'goal', name: 'Other' })
     ];
     localStorage.setItem(
@@ -2238,10 +2372,14 @@ test('given a selected list row, only its connected items remain and graph inher
     await act(async () => {
         ReactDOM.render(<App />, container);
     });
-    act(() => Simulate.click(required(container.querySelector('[aria-label="Open goal Child"]'))));
+    act(() =>
+        changeValue(required(container.querySelector('[aria-label="Search workspace"]')), 'Parent')
+    );
+    act(() => Simulate.click(required(container.querySelector('[aria-label="Open goal Parent"]'))));
     expect(
         [...container.querySelectorAll<HTMLElement>('.entry-row')].map((row) => row.dataset.entryId)
-    ).toEqual(['group', 'parent', 'child']);
+    ).toEqual(['group', 'parent']);
+    expect(container.querySelector('.details')).not.toBeNull();
     act(() =>
         Simulate.click(
             required(
@@ -2251,7 +2389,53 @@ test('given a selected list row, only its connected items remain and graph inher
             )
         )
     );
-    expect(graphSnapshot().nodes.map((node) => node.id)).toEqual(['parent', 'child']);
+    expect(graphSnapshot().nodes.map((node) => node.id)).toEqual([
+        'parent',
+        'child',
+        'metric',
+        'other'
+    ]);
+    expect(container.querySelector('.workspace-filters')).toBeNull();
+    const graphInstance: NetworkMock = mockNetwork.mock.results.at(-1)!.value;
+    act(() => {
+        required(graphInstance.on.mock.calls.find(([eventName]) => eventName === 'selectNode'))[1]({
+            nodes: ['other']
+        });
+    });
+    expect(graphSnapshot().nodes.map((node) => node.id)).toEqual(['other']);
+    act(() =>
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].find(
+                    (button) => button.textContent?.trim() === 'Tree'
+                )
+            )
+        )
+    );
+    expect(graphSnapshot().nodes.map((node) => node.id)).toEqual([
+        'parent',
+        'child',
+        'metric',
+        'other'
+    ]);
+    expect(container.querySelector('.workspace-filters')).toBeNull();
+    const treeInstance: NetworkMock = mockNetwork.mock.results.at(-1)!.value;
+    act(() => {
+        required(treeInstance.on.mock.calls.find(([eventName]) => eventName === 'selectNode'))[1]({
+            nodes: ['parent']
+        });
+    });
+    expect(graphSnapshot().nodes.map((node) => node.id)).toEqual(['parent', 'child', 'metric']);
+    act(() =>
+        Simulate.click(
+            required(
+                [...container.querySelectorAll<HTMLButtonElement>('.view-switch button')].find(
+                    (button) => button.textContent?.trim() === 'Graph'
+                )
+            )
+        )
+    );
+    expect(graphSnapshot().nodes.map((node) => node.id)).toEqual(['other']);
     act(() =>
         Simulate.click(
             required(
@@ -2261,8 +2445,19 @@ test('given a selected list row, only its connected items remain and graph inher
             )
         )
     );
-    act(() => Simulate.click(required(container.querySelector('[aria-label="Show full list"]'))));
-    expect(container.querySelector('[data-entry-id="other"]')).not.toBeNull();
+    expect(
+        [...container.querySelectorAll<HTMLElement>('.entry-row')].map((row) => row.dataset.entryId)
+    ).toEqual(['group', 'parent']);
+    expect(container.querySelector('.details')).not.toBeNull();
+    expect(
+        required(container.querySelector<HTMLInputElement>('[aria-label="Search workspace"]')).value
+    ).toBe('Parent');
+    act(() =>
+        changeValue(required(container.querySelector('[aria-label="Search workspace"]')), '')
+    );
+    expect(
+        [...container.querySelectorAll<HTMLElement>('.entry-row')].map((row) => row.dataset.entryId)
+    ).toEqual(['group', 'parent', 'child', 'metric', 'other']);
     expect(savedGraph().items).toEqual(items);
 });
 

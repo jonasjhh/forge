@@ -8,6 +8,7 @@ import {
     Compass,
     GitBranch,
     GripVertical,
+    LayoutDashboard,
     ListTree,
     List,
     LoaderCircle,
@@ -28,6 +29,7 @@ import AssigneeFilter from '../components/assignees/AssigneeFilter';
 import EntryDetails from '../features/workspace/components/EntryDetails';
 import EntryDialog from '../features/workspace/components/EntryDialog';
 import GoalList from '../features/workspace/components/GoalList';
+import CardsView from '../features/workspace/components/CardsView';
 import ItemGraph from '../features/workspace/components/ItemGraph';
 import LabelManager from '../features/workspace/components/LabelManager';
 import WorkspaceTransfer from '../features/workspace/components/WorkspaceTransfer';
@@ -35,7 +37,6 @@ import {
     entryTypes,
     connectedEntries,
     goalCategories,
-    includeAncestors,
     linkListEntry,
     matchesAssignees,
     moveGoalToGroup,
@@ -54,6 +55,8 @@ import type { GraphHandle } from '../features/workspace/components/ItemGraph';
 import './App.css';
 
 type TypeFilter = Exclude<EntryType, 'goal'> | GoalCategory;
+type RelationshipViewMode = Extract<ViewMode, 'graph' | 'tree'>;
+const MAX_WORKSPACE_ITEMS = 500;
 
 const typeOptions: { value: TypeFilter; label: string }[] = [
     { value: 'group', label: entryTypes.group.plural },
@@ -65,6 +68,11 @@ function App() {
     const [items, setItems] = useState<WorkspaceEntry[]>([]);
     const [labels, setLabels] = useState<WorkspaceLabel[]>([]);
     const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null);
+    const [focusByView, setFocusByView] = useState<Record<RelationshipViewMode, string | null>>({
+        graph: null,
+        tree: null
+    });
     const [sidebarWidth, setSidebarWidth] = useState(320);
     const workspaceRef = useRef<HTMLDivElement>(null);
     const sidebarResize = useRef<{ startX: number; width: number } | null>(null);
@@ -93,6 +101,9 @@ function App() {
     const [reload, setReload] = useState(0);
     const graph = useRef<GraphHandle>(null);
     const saving = useRef(false);
+    const deliveries = items.filter(
+        (item) => item.type === 'goal' && (item.goalCategory ?? 'Delivery') === 'Delivery'
+    );
 
     useEffect(() => {
         let cancelled = false;
@@ -121,6 +132,14 @@ function App() {
             cancelled = true;
         };
     }, [reload]);
+
+    useEffect(() => {
+        const availableDeliveries = items.filter(
+            (item) => item.type === 'goal' && (item.goalCategory ?? 'Delivery') === 'Delivery'
+        );
+        if (availableDeliveries.some((delivery) => delivery.id === selectedDeliveryId)) return;
+        setSelectedDeliveryId(availableDeliveries[0]?.id ?? null);
+    }, [items, selectedDeliveryId]);
 
     async function save(
         nextItems: WorkspaceEntry[],
@@ -173,10 +192,11 @@ function App() {
             searchableText.includes(normalizedSearch)
         );
     });
-    const contextualItems = includeAncestors(items, matchingItems);
-    const graphItems = selectedId ? connectedEntries(contextualItems, selectedId) : contextualItems;
-    const focusedIds = new Set(graphItems.map((item) => item.id));
-    const visibleItems = matchingItems.filter((item) => focusedIds.has(item.id));
+    const focusForMode = mode === 'graph' || mode === 'tree' ? focusByView[mode] : null;
+    const focusedId =
+        focusForMode && items.some((item) => item.id === focusForMode) ? focusForMode : null;
+    const graphItems = focusedId ? connectedEntries(items, focusedId) : items;
+    const visibleItems = matchingItems;
     const relationshipItems = graphItems.filter((item) => item.type !== 'group');
     const filtered =
         assigneeFilter.length > 0 ||
@@ -305,12 +325,25 @@ function App() {
                     <Tags size={16} />
                     <span className="view-label">Labels</span>
                 </button>
+                <button
+                    type="button"
+                    aria-label="Cards"
+                    title="Cards"
+                    aria-pressed={mode === 'cards'}
+                    onClick={() => setMode('cards')}
+                >
+                    <LayoutDashboard size={16} />
+                    <span className="view-label">Cards</span>
+                </button>
             </div>
             <div className="view-toolbar-actions">
-                {mode !== 'labels' && selected && selected.type !== 'group' && (
+                {(mode === 'graph' || mode === 'tree') && focusedId && (
                     <IconButton
-                        label={`Show full ${mode === 'list' ? 'list' : mode}`}
-                        onClick={() => setSelectedId(null)}
+                        label={`Show full ${mode}`}
+                        onClick={() => {
+                            setFocusByView((current) => ({ ...current, [mode]: null }));
+                            setSelectedId(null);
+                        }}
                     >
                         <ListTree size={16} />
                     </IconButton>
@@ -320,9 +353,11 @@ function App() {
                         ? listCountLabel
                         : mode === 'labels'
                           ? `${labels.length} labels`
-                          : `${relationshipItems.length} items · ${connections} relationships`}
+                          : mode === 'cards'
+                            ? `${deliveries.length} deliveries`
+                            : `${relationshipItems.length} items · ${connections} relationships`}
                 </span>
-                {!toolbarExpanded && mode !== 'labels' && filtered && (
+                {!toolbarExpanded && mode === 'list' && filtered && (
                     <button
                         type="button"
                         className="active-filter-indicator"
@@ -338,7 +373,10 @@ function App() {
                     label="Refresh workspace"
                     disabled={loading || busy}
                     onClick={() => {
-                        if (mode === 'graph' || mode === 'tree') setSelectedId(null);
+                        if (mode === 'graph' || mode === 'tree') {
+                            setSelectedId(null);
+                            setFocusByView((current) => ({ ...current, [mode]: null }));
+                        }
                         setReload((value) => value + 1);
                     }}
                 >
@@ -380,7 +418,10 @@ function App() {
                     <button
                         className="button primary"
                         disabled={
-                            loading || busy || items.length >= 100 || Boolean(error && !updatedAt)
+                            loading ||
+                            busy ||
+                            items.length >= MAX_WORKSPACE_ITEMS ||
+                            Boolean(error && !updatedAt)
                         }
                         onClick={() =>
                             openCreate('goal', selected?.type === 'group' ? selected.id : '')
@@ -400,7 +441,7 @@ function App() {
                 </div>
             </header>
             <div id="workspace-toolbar" className="workspace-toolbar" hidden={!toolbarExpanded}>
-                {mode !== 'labels' && workspaceFilters}
+                {mode === 'list' && workspaceFilters}
                 <div className="toolbar-actions">
                     <WorkspaceTransfer
                         graph={{ items, labels }}
@@ -409,6 +450,7 @@ function App() {
                             const saved = await save(imported.items, imported.labels);
                             if (saved) {
                                 setSelectedId(null);
+                                setFocusByView({ graph: null, tree: null });
                                 setDialog(null);
                                 setSearch('');
                                 setTypeFilter(typeOptions.map((option) => option.value));
@@ -422,7 +464,10 @@ function App() {
                     <button
                         className="button secondary"
                         disabled={
-                            loading || busy || items.length >= 100 || Boolean(error && !updatedAt)
+                            loading ||
+                            busy ||
+                            items.length >= MAX_WORKSPACE_ITEMS ||
+                            Boolean(error && !updatedAt)
                         }
                         onClick={() => openCreate('group')}
                     >
@@ -536,6 +581,13 @@ function App() {
                                 return saved;
                             }}
                         />
+                    ) : mode === 'cards' ? (
+                        <CardsView
+                            items={items}
+                            labels={labels}
+                            selectedId={selectedDeliveryId}
+                            onSelect={setSelectedDeliveryId}
+                        />
                     ) : mode === 'list' ? (
                         <div className="list-workspace">
                             {loading ? (
@@ -587,29 +639,37 @@ function App() {
                                 ) : relationshipItems.length ? (
                                     <ItemGraph
                                         ref={graph}
-                                        items={contextualItems}
-                                        visibleIds={contextualItems.map((item) => item.id)}
+                                        items={items}
+                                        visibleIds={items.map((item) => item.id)}
                                         focusedIds={
-                                            selectedId
+                                            focusedId
                                                 ? graphItems.map((item) => item.id)
                                                 : undefined
                                         }
                                         labels={labels}
-                                        selectedId={selectedId}
+                                        selectedId={focusedId}
                                         mode={mode}
-                                        onSelect={setSelectedId}
-                                        onClearSelection={() => setSelectedId(null)}
+                                        onSelect={(id) => {
+                                            setSelectedId(id);
+                                            setFocusByView((current) => ({
+                                                ...current,
+                                                [mode]: id
+                                            }));
+                                        }}
+                                        onClearSelection={() => {
+                                            setSelectedId(null);
+                                            setFocusByView((current) => ({
+                                                ...current,
+                                                [mode]: null
+                                            }));
+                                        }}
                                     />
                                 ) : (
                                     <div className="empty-state">
                                         <span className="empty-symbol">
                                             <GitBranch size={42} strokeWidth={1.2} />
                                         </span>
-                                        <h2>
-                                            {filtered
-                                                ? 'No matching goals or metrics'
-                                                : 'No goals yet'}
-                                        </h2>
+                                        <h2>No goals yet</h2>
                                         <button
                                             className="button secondary"
                                             disabled={Boolean(error)}
@@ -658,7 +718,7 @@ function App() {
                         </React.Fragment>
                     )}
                 </section>
-                {selected && (
+                {selected && mode !== 'cards' && (
                     <EntryDetails
                         key={selected.id}
                         item={selected}
