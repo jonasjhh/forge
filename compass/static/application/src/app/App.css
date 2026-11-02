@@ -302,10 +302,31 @@
 }
 .goal-table .column-parents,
 .goal-table .column-metrics,
-.goal-table .column-status {
+.goal-table .column-status,
+.goal-table .column-jira-link {
     text-align: center;
     padding-left: 3px;
     padding-right: 3px;
+}
+.goal-table .column-jira-link .jira-issue-link {
+    justify-content: center;
+    gap: 3px;
+    font-size: 11px;
+}
+.goal-table .column-jira-link .jira-issue-link > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.goal-table .column-jira-link .jira-issue-link > svg:last-child {
+    display: none;
+}
+.table-jira-issues,
+.delivery-card-jira-links {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
 }
 .goal-table .column-status .goal-status-badge {
     min-height: 22px;

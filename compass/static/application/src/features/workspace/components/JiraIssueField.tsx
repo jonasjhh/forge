@@ -5,7 +5,13 @@ import { loadIssue, openIssue, searchIssues } from '../../../services/jiraIssues
 import type { JiraIssue } from '../../../services/jiraIssues';
 import './jiraIssue.css';
 
-export function JiraIssueLink({ issueId }: { issueId: string }) {
+export function JiraIssueLink({
+    issueId,
+    compact = false
+}: {
+    issueId: string;
+    compact?: boolean;
+}) {
     const [attempt, setAttempt] = useState(0);
     const [result, setResult] = useState<{
         issueId: string;
@@ -60,6 +66,8 @@ export function JiraIssueLink({ issueId }: { issueId: string }) {
             <a
                 className="jira-issue-link"
                 href={`/browse/${encodeURIComponent(issue.key)}`}
+                aria-label={`${issue.key}: ${issue.summary}`}
+                title={`${issue.key}: ${issue.summary}`}
                 target="_blank"
                 rel="noreferrer"
                 onClick={async (event) => {
@@ -75,7 +83,7 @@ export function JiraIssueLink({ issueId }: { issueId: string }) {
             >
                 <Link2 size={15} aria-hidden="true" />
                 <span>
-                    <strong>{issue.key}</strong> {issue.summary}
+                    <strong>{issue.key}</strong> {!compact && issue.summary}
                 </span>
                 <ExternalLink size={13} aria-hidden="true" />
             </a>
@@ -90,8 +98,8 @@ export function JiraIssueLink({ issueId }: { issueId: string }) {
 
 interface JiraIssueFieldProps {
     id: string;
-    value?: string;
-    onChange: (issueId: string | undefined) => void;
+    value: string[];
+    onChange: (issueIds: string[]) => void;
     disabled?: boolean;
 }
 
@@ -108,7 +116,7 @@ export default function JiraIssueField({ id, value, onChange, disabled }: JiraIs
         setError('');
         setSearched(false);
         setLoading(false);
-        if (value || disabled || query.trim().length < 2) return;
+        if (disabled || value.length >= 20 || query.trim().length < 2) return;
         setLoading(true);
         const timer = setTimeout(() => {
             searchIssues(query.trim())
@@ -134,31 +142,33 @@ export default function JiraIssueField({ id, value, onChange, disabled }: JiraIs
         };
     }, [query, value, disabled]);
 
+    const availableIssues = issues.filter((issue) => !value.includes(issue.id));
+
     return (
         <div className="jira-issue-field">
             <label htmlFor={id}>
-                Jira-link <span className="optional">optional</span>
+                Jira-link <span className="count">{value.length}</span>{' '}
+                <span className="optional">optional, up to 20</span>
             </label>
-            {value ? (
-                <div className="jira-issue-selected">
-                    <JiraIssueLink key={value} issueId={value} />
-                    <IconButton
-                        label="Remove Jira link"
-                        disabled={disabled}
-                        onClick={() => {
-                            setQuery('');
-                            onChange(undefined);
-                        }}
-                    >
-                        <Unlink size={16} />
-                    </IconButton>
-                </div>
-            ) : null}
+            <ul className="jira-issue-selected-list">
+                {value.map((issueId) => (
+                    <li key={issueId} className="jira-issue-selected">
+                        <JiraIssueLink issueId={issueId} />
+                        <IconButton
+                            label={`Remove Jira link ${issueId}`}
+                            disabled={disabled}
+                            onClick={() => onChange(value.filter((current) => current !== issueId))}
+                        >
+                            <Unlink size={16} />
+                        </IconButton>
+                    </li>
+                ))}
+            </ul>
             <input
                 id={id}
                 type="search"
                 value={query}
-                disabled={disabled || Boolean(value)}
+                disabled={disabled || value.length >= 20}
                 placeholder="Search Jira key or title"
                 autoComplete="off"
                 maxLength={200}
@@ -174,20 +184,22 @@ export default function JiraIssueField({ id, value, onChange, disabled }: JiraIs
                     {error}
                 </p>
             )}
-            {!loading && searched && !issues.length && (
+            {!loading && searched && !availableIssues.length && (
                 <p className="picker-status" role="status">
-                    No matching Jira issues.
+                    {issues.length
+                        ? 'All matching issues are already linked.'
+                        : 'No matching Jira issues.'}
                 </p>
             )}
-            {!value && issues.length > 0 && (
+            {availableIssues.length > 0 && (
                 <ul className="jira-issue-results" aria-label="Jira issue matches">
-                    {issues.map((issue) => (
+                    {availableIssues.map((issue) => (
                         <li key={issue.id}>
                             <button
                                 type="button"
                                 disabled={disabled}
                                 onClick={() => {
-                                    onChange(issue.id);
+                                    onChange([...value, issue.id]);
                                     setQuery('');
                                 }}
                             >

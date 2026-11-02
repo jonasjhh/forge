@@ -55,7 +55,7 @@ export default function EntryDialog({
     const [goalCategory, setGoalCategory] = useState<GoalCategory>('Delivery');
     const [status, setStatus] = useState<GoalStatus | ''>('');
     const [targetDate, setTargetDate] = useState('');
-    const [jiraIssueId, setJiraIssueId] = useState<string>();
+    const [jiraIssueIds, setJiraIssueIds] = useState<string[]>([]);
     const [metric, setMetric] = useState<MetricValues>({
         currentValue: 0,
         targetValue: 100,
@@ -103,7 +103,7 @@ export default function EntryDialog({
                                           goalCategory,
                                           ...(status ? { status } : {}),
                                           ...(targetDate ? { targetDate } : {}),
-                                          ...(jiraIssueId ? { jiraIssueId } : {})
+                                          ...(jiraIssueIds.length ? { jiraIssueIds } : {})
                                       }
                                     : {}),
                                 ...(type === 'metric' ? metric : {})
@@ -234,8 +234,8 @@ export default function EntryDialog({
                         {type === 'goal' && (
                             <JiraIssueField
                                 id="new-jira-link"
-                                value={jiraIssueId}
-                                onChange={setJiraIssueId}
+                                value={jiraIssueIds}
+                                onChange={setJiraIssueIds}
                                 disabled={busy}
                             />
                         )}

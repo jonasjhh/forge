@@ -87,14 +87,19 @@ export function validateGraph(payload: unknown): Graph {
         ) {
             throw new Error('Goal target dates must use the YYYY-MM format.');
         }
-        const jiraIssueId = item.jiraIssueId;
+        const jiraIssueIds = item.jiraIssueIds;
         if (
-            jiraIssueId !== undefined &&
+            jiraIssueIds !== undefined &&
             (type !== 'goal' ||
-                typeof jiraIssueId !== 'string' ||
-                !/^[1-9]\d{0,19}$/.test(jiraIssueId))
+                !Array.isArray(jiraIssueIds) ||
+                jiraIssueIds.length > 20 ||
+                jiraIssueIds.some(
+                    (issueId: unknown) =>
+                        typeof issueId !== 'string' || !/^[1-9]\d{0,19}$/.test(issueId)
+                ) ||
+                new Set(jiraIssueIds).size !== jiraIssueIds.length)
         ) {
-            throw new Error('Jira links require a valid numeric issue ID on a goal.');
+            throw new Error('Jira links require up to 20 unique numeric issue IDs on a goal.');
         }
         const assignees = item.assignees ?? [];
         if (!Array.isArray(assignees) || assignees.length > 20) {
@@ -189,7 +194,7 @@ export function validateGraph(payload: unknown): Graph {
                       goalCategory: goalCategory as GoalCategory,
                       ...(status ? { status: status as GoalStatus } : {}),
                       ...(targetDate ? { targetDate } : {}),
-                      ...(jiraIssueId ? { jiraIssueId: jiraIssueId as string } : {})
+                      ...(jiraIssueIds?.length ? { jiraIssueIds: jiraIssueIds as string[] } : {})
                   }
                 : {}),
             ...metric

@@ -91,9 +91,9 @@ Export downloads the entire loaded workspace as a JSON file containing `items` a
 
 ## Jira Links
 
-Each goal can optionally link to one Jira issue. Search by key or title in the goal's Jira-link field, then save the goal. The selected issue's key and title open the issue in Jira; the same link is shown in Cards. Removing the link takes effect when the goal is saved and does not change the Jira issue.
+Each goal can link to up to 20 Jira issues. Search by key or title in the goal's Jira-link field, select multiple issues, and save the goal. Each selected issue's key and title open the issue in Jira; the links are shown in List and Cards. Remove links individually; changes take effect when the goal is saved and do not change Jira issues.
 
-Only the stable `jiraIssueId` is stored and exported. Issue keys and summaries are resolved live as the current Jira user and are not copied into the shared workspace. Deleted or inaccessible issues show an unavailable state without deleting the association. Search and lookup require the user's Jira issue permissions. The app additionally requires `read:jira-work`: deploy and upgrade the installation to approve this scope before using Jira links.
+Only the stable `jiraIssueIds` are stored and exported. Issue keys and summaries are resolved live as the current Jira user and are not copied into the shared workspace. Deleted or inaccessible issues show an unavailable state without deleting the association. Search and lookup require the user's Jira issue permissions. The app additionally requires `read:jira-work`: deploy and upgrade the installation to approve this scope before using Jira links.
 
 JSON export/import preserves issue IDs, not issue metadata or Jira issues themselves. IDs belong to the originating Jira site; imports into another site do not remap them. Local preview offers only clearly marked `DEMO-1` and `DEMO-2` sample issues.
 

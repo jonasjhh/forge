@@ -15,6 +15,14 @@
     gap: 6px;
 }
 
+.jira-issue-selected-list {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
 .jira-issue-reference {
     min-width: 0;
     flex: 1;

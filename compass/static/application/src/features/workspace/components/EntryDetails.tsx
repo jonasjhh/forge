@@ -68,7 +68,7 @@ export default function EntryDetails({
     const [goalCategory, setGoalCategory] = useState<GoalCategory>(item.goalCategory ?? 'Delivery');
     const [status, setStatus] = useState<GoalStatus | ''>(item.status ?? '');
     const [targetDate, setTargetDate] = useState(item.targetDate ?? '');
-    const [jiraIssueId, setJiraIssueId] = useState(item.jiraIssueId);
+    const [jiraIssueIds, setJiraIssueIds] = useState(item.jiraIssueIds ?? []);
     const [metric, setMetric] = useState({
         currentValue: item.currentValue ?? null,
         targetValue: item.targetValue ?? null,
@@ -84,7 +84,7 @@ export default function EntryDetails({
         setGoalCategory(item.goalCategory ?? 'Delivery');
         setStatus(item.status ?? '');
         setTargetDate(item.targetDate ?? '');
-        setJiraIssueId(item.jiraIssueId);
+        setJiraIssueIds(item.jiraIssueIds ?? []);
         setMetric({
             currentValue: item.currentValue ?? null,
             targetValue: item.targetValue ?? null,
@@ -122,7 +122,7 @@ export default function EntryDetails({
                   goalCategory,
                   status: status || undefined,
                   targetDate: targetDate || undefined,
-                  jiraIssueId
+                  jiraIssueIds: jiraIssueIds.length ? jiraIssueIds : undefined
               }
             : {}),
         ...(item.type === 'metric' ? metric : {})
@@ -251,8 +251,8 @@ export default function EntryDetails({
                         <JiraIssueField
                             key={item.id}
                             id="goal-jira-link"
-                            value={jiraIssueId}
-                            onChange={setJiraIssueId}
+                            value={jiraIssueIds}
+                            onChange={setJiraIssueIds}
                             disabled={busy}
                         />
                     </React.Fragment>

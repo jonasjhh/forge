@@ -295,12 +295,13 @@ export default function CardsView({
                                 </CardSection>
                             </div>
                         </div>
-                        {selected.jiraIssueId && (
+                        {Boolean(selected.jiraIssueIds?.length) && (
                             <CardSection title="Jira-link">
-                                <JiraIssueLink
-                                    key={selected.jiraIssueId}
-                                    issueId={selected.jiraIssueId}
-                                />
+                                <div className="delivery-card-jira-links">
+                                    {selected.jiraIssueIds?.map((issueId) => (
+                                        <JiraIssueLink key={issueId} issueId={issueId} />
+                                    ))}
+                                </div>
                             </CardSection>
                         )}
                         {selected.assignees.length > 0 && (

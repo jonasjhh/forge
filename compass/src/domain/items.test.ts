@@ -59,29 +59,52 @@ test('given a goal status, the graph preserves supported values and rejects unkn
     );
 });
 
-test('given a linked Jira issue, saving preserves its stable ID without adding issue metadata', () => {
+test('given multiple linked Jira issues, saving preserves their stable IDs without issue metadata', () => {
     const graph = validateGraph({
-        items: [{ ...item('goal', [], 'goal'), jiraIssueId: '10001' }]
+        items: [{ ...item('goal', [], 'goal'), jiraIssueIds: ['10001', '10002'] }]
     });
-    assert.deepEqual(graph.items[0], { ...item('goal', [], 'goal'), jiraIssueId: '10001' });
+    assert.deepEqual(graph.items[0], {
+        ...item('goal', [], 'goal'),
+        jiraIssueIds: ['10001', '10002']
+    });
 });
 
-test('given an invalid Jira link or a link on a non-goal, saving is rejected', () => {
+test('given invalid or duplicate Jira IDs, or links on non-goals, saving is rejected', () => {
     assert.throws(
-        () => validateGraph({ items: [{ ...item('goal', [], 'goal'), jiraIssueId: 'LOV-123' }] }),
-        /numeric issue ID/
+        () =>
+            validateGraph({ items: [{ ...item('goal', [], 'goal'), jiraIssueIds: ['LOV-123'] }] }),
+        /numeric issue IDs/
     );
     assert.throws(
-        () => validateGraph({ items: [{ ...item('goal', [], 'goal'), jiraIssueId: 10001 }] }),
-        /numeric issue ID/
+        () => validateGraph({ items: [{ ...item('goal', [], 'goal'), jiraIssueIds: [10001] }] }),
+        /numeric issue IDs/
     );
     assert.throws(
-        () => validateGraph({ items: [{ ...item('goal', [], 'goal'), jiraIssueId: '' }] }),
-        /numeric issue ID/
+        () => validateGraph({ items: [{ ...item('goal', [], 'goal'), jiraIssueIds: [''] }] }),
+        /numeric issue IDs/
     );
     assert.throws(
-        () => validateGraph({ items: [{ ...item('group'), jiraIssueId: '10001' }] }),
-        /numeric issue ID/
+        () =>
+            validateGraph({
+                items: [{ ...item('goal', [], 'goal'), jiraIssueIds: ['10001', '10001'] }]
+            }),
+        /numeric issue IDs/
+    );
+    assert.throws(
+        () =>
+            validateGraph({
+                items: [
+                    {
+                        ...item('goal', [], 'goal'),
+                        jiraIssueIds: Array.from({ length: 21 }, (_, index) => String(index + 1))
+                    }
+                ]
+            }),
+        /numeric issue IDs/
+    );
+    assert.throws(
+        () => validateGraph({ items: [{ ...item('group'), jiraIssueIds: ['10001'] }] }),
+        /numeric issue IDs/
     );
 });
 

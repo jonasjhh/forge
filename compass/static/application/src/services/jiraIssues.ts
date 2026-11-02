@@ -8,6 +8,7 @@ const previewIssues: JiraIssue[] = [
     { id: '10001', key: 'DEMO-1', summary: 'Preview: Improve the application workflow' },
     { id: '10002', key: 'DEMO-2', summary: 'Preview: Publish the delivery plan' }
 ];
+const issueRequests = new Map<string, Promise<JiraIssue | null>>();
 
 function isPreview(): boolean {
     return ['localhost', '127.0.0.1'].includes(window.location.hostname);
@@ -52,7 +53,19 @@ export async function searchJiraIssues(query: string): Promise<JiraIssue[]> {
 
 export async function loadIssue(issueId: string): Promise<JiraIssue | null> {
     if (isPreview()) return previewIssues.find((issue) => issue.id === issueId) ?? null;
-    return loadJiraIssue(issueId);
+    let request = issueRequests.get(issueId);
+    if (!request) {
+        request = loadJiraIssue(issueId);
+        issueRequests.set(issueId, request);
+    }
+    try {
+        const issue = await request;
+        if (!issue) issueRequests.delete(issueId);
+        return issue;
+    } catch (error) {
+        issueRequests.delete(issueId);
+        throw error;
+    }
 }
 
 export async function loadJiraIssue(issueId: string): Promise<JiraIssue | null> {

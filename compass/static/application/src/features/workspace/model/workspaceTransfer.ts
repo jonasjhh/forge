@@ -48,11 +48,15 @@ function validateEntry(value: unknown): asserts value is WorkspaceEntry {
         'Entries must be groups, goals, or metrics.'
     );
     requireValid(
-        value.jiraIssueId === undefined ||
+        value.jiraIssueIds === undefined ||
             (value.type === 'goal' &&
-                typeof value.jiraIssueId === 'string' &&
-                /^[1-9]\d{0,19}$/.test(value.jiraIssueId)),
-        'Jira links require a valid numeric issue ID on a goal.'
+                Array.isArray(value.jiraIssueIds) &&
+                value.jiraIssueIds.length <= 20 &&
+                value.jiraIssueIds.every(
+                    (issueId) => typeof issueId === 'string' && /^[1-9]\d{0,19}$/.test(issueId)
+                ) &&
+                new Set(value.jiraIssueIds).size === value.jiraIssueIds.length),
+        'Jira links require up to 20 unique numeric issue IDs on a goal.'
     );
     requireValid(
         validIds(value.childIds, 300) && validIds(value.labelIds, 20),

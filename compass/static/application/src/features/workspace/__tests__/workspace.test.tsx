@@ -204,7 +204,7 @@ test('given the New goal dialog, fields follow the requested order and parent se
     );
     const dialog = required(container.querySelector('dialog'));
     const fields = dialog.querySelectorAll(
-        '#new-type, #new-goal-category, #new-goal-status, #new-target-date, #new-name, #new-description, #new-assignees, summary[aria-label="Labels"], #new-parent'
+        '#new-type, #new-goal-category, #new-goal-status, #new-target-date, #new-name, #new-description, #new-assignees, #new-jira-link, summary[aria-label="Labels"], #new-parent'
     );
     expect([...fields].map((field) => field.id || field.getAttribute('aria-label'))).toEqual([
         'new-type',
@@ -214,6 +214,7 @@ test('given the New goal dialog, fields follow the requested order and parent se
         'new-name',
         'new-description',
         'new-assignees',
+        'new-jira-link',
         'Labels',
         'new-parent'
     ]);
@@ -323,9 +324,16 @@ test('given a Jira-link, creating, replacing and clearing it only persist the is
         await act(async () =>
             Simulate.click(required(container.querySelector('.jira-issue-results button')))
         );
+        act(() => changeValue(container.querySelector('#new-jira-link'), 'DEMO-2'));
+        await act(async () => {
+            jest.advanceTimersByTime(250);
+        });
+        await act(async () =>
+            Simulate.click(required(container.querySelector('.jira-issue-results button')))
+        );
         expect(localStorage.getItem('compass-preview-v1')).toBeNull();
         await act(async () => Simulate.submit(required(container.querySelector('dialog form'))));
-        expect(savedGraph().items[0].jiraIssueId).toBe('10001');
+        expect(savedGraph().items[0].jiraIssueIds).toEqual(['10001', '10002']);
         expect(JSON.stringify(savedGraph())).not.toContain('DEMO-1');
         expect(JSON.stringify(savedGraph())).not.toContain('Preview:');
 
@@ -336,10 +344,12 @@ test('given a Jira-link, creating, replacing and clearing it only persist the is
         );
         expect(container.querySelector('.jira-issue-link')?.textContent).toContain('DEMO-1');
         act(() =>
-            Simulate.click(required(container.querySelector('[aria-label="Remove Jira link"]')))
+            Simulate.click(
+                required(container.querySelector('[aria-label="Remove Jira link 10001"]'))
+            )
         );
-        expect(savedGraph().items[0].jiraIssueId).toBe('10001');
-        act(() => changeValue(container.querySelector('#goal-jira-link'), 'DEMO-2'));
+        expect(savedGraph().items[0].jiraIssueIds).toEqual(['10001', '10002']);
+        act(() => changeValue(container.querySelector('#goal-jira-link'), 'DEMO-1'));
         await act(async () => {
             jest.advanceTimersByTime(250);
         });
@@ -349,11 +359,12 @@ test('given a Jira-link, creating, replacing and clearing it only persist the is
         await act(async () =>
             Simulate.submit(required(container.querySelector('#entry-edit-form')))
         );
-        expect(savedGraph().items[0].jiraIssueId).toBe('10002');
+        expect(savedGraph().items[0].jiraIssueIds).toEqual(['10002', '10001']);
 
         await act(async () =>
             Simulate.click(required(container.querySelector('[aria-label="Cards"]')))
         );
+        expect(container.querySelectorAll('.delivery-card .jira-issue-link')).toHaveLength(2);
         expect(container.querySelector('.delivery-card .jira-issue-link')?.textContent).toContain(
             'DEMO-2'
         );
@@ -365,12 +376,23 @@ test('given a Jira-link, creating, replacing and clearing it only persist the is
 
         act(() => Simulate.click(required(container.querySelector('[aria-label="List"]'))));
         act(() =>
-            Simulate.click(required(container.querySelector('[aria-label="Remove Jira link"]')))
+            Simulate.click(
+                required(container.querySelector('[aria-label="Remove Jira link 10002"]'))
+            )
         );
         await act(async () =>
             Simulate.submit(required(container.querySelector('#entry-edit-form')))
         );
-        expect(savedGraph().items[0].jiraIssueId).toBeUndefined();
+        expect(savedGraph().items[0].jiraIssueIds).toEqual(['10001']);
+        act(() =>
+            Simulate.click(
+                required(container.querySelector('[aria-label="Remove Jira link 10001"]'))
+            )
+        );
+        await act(async () =>
+            Simulate.submit(required(container.querySelector('#entry-edit-form')))
+        );
+        expect(savedGraph().items[0].jiraIssueIds).toBeUndefined();
     } finally {
         jest.useRealTimers();
     }
@@ -385,7 +407,7 @@ test('given an inaccessible Jira issue, unrelated edits preserve its link until 
                     id: 'goal',
                     type: 'goal',
                     name: 'Restricted link',
-                    jiraIssueId: '90001'
+                    jiraIssueIds: ['90001', '90002']
                 })
             ],
             labels: [],
@@ -405,10 +427,17 @@ test('given an inaccessible Jira issue, unrelated edits preserve its link until 
     );
     act(() => changeValue(container.querySelector('#item-description'), 'Updated description'));
     await act(async () => Simulate.submit(required(container.querySelector('#entry-edit-form'))));
-    expect(savedGraph().items[0].jiraIssueId).toBe('90001');
-    act(() => Simulate.click(required(container.querySelector('[aria-label="Remove Jira link"]'))));
+    expect(savedGraph().items[0].jiraIssueIds).toEqual(['90001', '90002']);
+    act(() =>
+        Simulate.click(required(container.querySelector('[aria-label="Remove Jira link 90001"]')))
+    );
     await act(async () => Simulate.submit(required(container.querySelector('#entry-edit-form'))));
-    expect(savedGraph().items[0].jiraIssueId).toBeUndefined();
+    expect(savedGraph().items[0].jiraIssueIds).toEqual(['90002']);
+    act(() =>
+        Simulate.click(required(container.querySelector('[aria-label="Remove Jira link 90002"]')))
+    );
+    await act(async () => Simulate.submit(required(container.querySelector('#entry-edit-form'))));
+    expect(savedGraph().items[0].jiraIssueIds).toBeUndefined();
 });
 
 test('given an older Jira search completing late, it cannot replace the latest results', async () => {
@@ -424,7 +453,10 @@ test('given an older Jira search completing late, it cannot replace the latest r
             )
             .mockResolvedValueOnce([{ id: '10002', key: 'DEMO-2', summary: 'Latest result' }]);
         act(() => {
-            ReactDOM.render(<JiraIssueField id="test-jira" onChange={() => {}} />, container);
+            ReactDOM.render(
+                <JiraIssueField id="test-jira" value={[]} onChange={() => {}} />,
+                container
+            );
         });
         act(() => changeValue(container.querySelector('#test-jira'), 'old'));
         await act(async () => {
@@ -453,7 +485,10 @@ test('given a failed Jira search, the field shows an error rather than reporting
     try {
         jest.spyOn(jiraIssues, 'searchIssues').mockRejectedValueOnce(new Error('Forbidden'));
         act(() => {
-            ReactDOM.render(<JiraIssueField id="test-jira" onChange={() => {}} />, container);
+            ReactDOM.render(
+                <JiraIssueField id="test-jira" value={[]} onChange={() => {}} />,
+                container
+            );
         });
         act(() => changeValue(container.querySelector('#test-jira'), 'LOV'));
         await act(async () => {
@@ -1978,7 +2013,7 @@ test.each([0, 1, 12])(
     }
 );
 
-test('given compact list rows, type icons replace subtitles and metric values remain inline', async () => {
+test('given compact list rows, Jira links, type icons and inline metrics remain visible', async () => {
     const items = [
         entryFixture({
             id: 'group',
@@ -1990,6 +2025,7 @@ test('given compact list rows, type icons replace subtitles and metric values re
             type: 'goal',
             name: 'Delivery goal',
             childIds: ['metric'],
+            jiraIssueIds: ['10001', '10002'],
             targetDate: '2027-03',
             status: 'yellow'
         }),
@@ -2021,6 +2057,9 @@ test('given compact list rows, type icons replace subtitles and metric values re
     await act(async () => {
         ReactDOM.render(<App />, container);
     });
+    await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     expect(container.querySelector('.goal-row-meta')).toBeNull();
     expect(container.querySelector('[data-entry-id="group"] .goal-name')?.textContent).toBe(
         'GroupGroup name'
@@ -2041,12 +2080,21 @@ test('given compact list rows, type icons replace subtitles and metric values re
             .querySelector('[data-entry-id="delivery"] .column-target-month time')
             ?.getAttribute('dateTime')
     ).toBe('2027-03-01');
+    expect(container.querySelector<HTMLTableColElement>('col.column-jira-link')?.style.width).toBe(
+        '12%'
+    );
+    expect(
+        container.querySelectorAll('[data-entry-id="delivery"] .column-jira-link a')
+    ).toHaveLength(2);
+    expect(
+        container.querySelector('[data-entry-id="delivery"] .column-jira-link')?.textContent
+    ).toContain('DEMO-1');
     expect(container.querySelector<HTMLTableColElement>('col.column-status')?.style.width).toBe(
-        '10%'
+        '8%'
     );
     expect(
         container.querySelector<HTMLTableColElement>('col.column-target-month')?.style.width
-    ).toBe('9%');
+    ).toBe('8%');
     const columns = [
         ...container.querySelectorAll<HTMLTableCellElement>('.goal-table thead th')
     ].map(
@@ -2054,7 +2102,8 @@ test('given compact list rows, type icons replace subtitles and metric values re
             header.querySelector<HTMLElement>('.column-heading-icon')?.getAttribute('aria-label') ||
             header.textContent?.trim()
     );
-    expect(columns.indexOf('Status')).toBe(columns.indexOf('Assignees') + 1);
+    expect(columns.indexOf('Jira link')).toBe(columns.indexOf('Assignees') + 1);
+    expect(columns.indexOf('Status')).toBe(columns.indexOf('Jira link') + 1);
     expect(columns.indexOf('Target month')).toBe(columns.indexOf('Status') + 1);
     expect(columns.indexOf('Labels')).toBe(columns.indexOf('Target month') + 1);
     expect(
@@ -2100,11 +2149,11 @@ test('given a table column resizer, arrow keys adjust the adjacent column widths
     const columns = required(
         container.querySelectorAll<HTMLTableColElement>('#workspace-entry-table col')
     );
-    expect(nameResizer.getAttribute('aria-valuenow')).toBe('40');
+    expect(nameResizer.getAttribute('aria-valuenow')).toBe('35');
     act(() => Simulate.keyDown(nameResizer, { key: 'ArrowRight' }));
-    expect(nameResizer.getAttribute('aria-valuenow')).toBe('42');
-    expect(columns[0].style.width).toBe('42%');
-    expect(columns[1].style.width).toBe('16%');
+    expect(nameResizer.getAttribute('aria-valuenow')).toBe('37');
+    expect(columns[0].style.width).toBe('37%');
+    expect(columns[1].style.width).toBe('14%');
 });
 
 test('given a table column resizer, pointer dragging adjusts adjacent column widths', () => {
@@ -2140,9 +2189,9 @@ test('given a table column resizer, pointer dragging adjusts adjacent column wid
     const columns = required(
         container.querySelectorAll<HTMLTableColElement>('#workspace-entry-table col')
     );
-    expect(nameResizer.getAttribute('aria-valuenow')).toBe('43');
-    expect(columns[0].style.width).toBe('43%');
-    expect(columns[1].style.width).toBe('15%');
+    expect(nameResizer.getAttribute('aria-valuenow')).toBe('38');
+    expect(columns[0].style.width).toBe('38%');
+    expect(columns[1].style.width).toBe('13%');
 });
 
 test('given a Jira avatar URL, the user chip shows the image and name and falls back to initials on failure', async () => {

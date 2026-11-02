@@ -25,7 +25,7 @@ export interface WorkspaceEntry {
     goalCategory?: GoalCategory;
     status?: GoalStatus;
     targetDate?: string;
-    jiraIssueId?: string;
+    jiraIssueIds?: string[];
     currentValue?: number | null;
     targetValue?: number | null;
     unit?: string;

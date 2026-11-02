@@ -30,6 +30,7 @@ import LabelChip from '../../../components/labels/LabelChip';
 import IconButton from '../../../components/ui/IconButton';
 import DraggableListRow from './DraggableListRow';
 import { GoalStatusBadge } from './GoalStatus';
+import { JiraIssueLink } from './JiraIssueField';
 import { formatTargetMonth } from '../model/targetMonth';
 import type { CollisionDetection, DragEndEvent } from '@dnd-kit/core';
 import type { DragEntryData, DropTargetData } from './DraggableListRow';
@@ -44,14 +45,15 @@ const goalCategoryIcons = {
 const columns = [
     { label: 'Name', className: 'column-name' },
     { label: 'Assignees', className: 'column-assignees' },
+    { label: 'Jira link', className: 'column-jira-link', icon: Link2 },
     { label: 'Status', className: 'column-status', icon: CircleDot },
     { label: 'Target month', className: 'column-target-month', icon: CalendarDays },
     { label: 'Labels', className: 'column-labels' },
     { label: 'Parent goals', className: 'column-parents', icon: GitBranch },
     { label: 'Metrics', className: 'column-metrics', icon: Gauge }
 ];
-const minimumColumnWidths = [24, 12, 8, 8, 10, 5, 5];
-const initialColumnWidths = [40, 18, 10, 9, 13, 5, 5];
+const minimumColumnWidths = [24, 12, 10, 8, 8, 9, 5, 5];
+const initialColumnWidths = [35, 16, 12, 8, 8, 11, 5, 5];
 
 function resizeColumnPair(widths: number[], index: number, amount: number): number[] {
     const pairWidth = widths[index] + widths[index + 1];
@@ -483,6 +485,22 @@ export default function GoalList({
                                                         </span>
                                                     )}
                                                 </div>
+                                            </td>
+                                            <td className="column-jira-link">
+                                                {entry.type === 'goal' &&
+                                                entry.jiraIssueIds?.length ? (
+                                                    <div className="table-jira-issues">
+                                                        {entry.jiraIssueIds.map((issueId) => (
+                                                            <JiraIssueLink
+                                                                key={issueId}
+                                                                issueId={issueId}
+                                                                compact
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <span className="muted">-</span>
+                                                )}
                                             </td>
                                             <td className="column-status">
                                                 {entry.type === 'goal' ? (
