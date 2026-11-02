@@ -224,7 +224,7 @@ test('given the New goal dialog, fields follow the requested order and parent se
     expect(required(dialog.querySelector<HTMLSelectElement>('#new-parent')).value).toBe('group');
 });
 
-test('given a goal category, creating and changing it updates the list label and icon', async () => {
+test('given a goal edit, status and target month autosave without saving other draft fields', async () => {
     const longGoalName = 'A'.repeat(120);
     await act(async () => {
         ReactDOM.render(<App />, container);
@@ -259,16 +259,28 @@ test('given a goal category, creating and changing it updates the list label and
     );
     expect(createdRow.querySelector('.entry-icon-capability')).not.toBeNull();
 
-    act(() => {
+    act(() =>
         Simulate.click(
             required(container.querySelector(`[aria-label="Open goal ${longGoalName}"]`))
-        );
-        changeValue(required(container.querySelector('#goal-category')), 'Decision');
-        changeValue(required(container.querySelector('#goal-status')), 'red');
-        changeValue(required(container.querySelector('#goal-target-date')), '2028-11');
-    });
+        )
+    );
+    act(() =>
+        changeValue(required(container.querySelector('#item-description')), 'Unsubmitted draft')
+    );
+    act(() => changeValue(required(container.querySelector('#goal-category')), 'Decision'));
+    act(() => changeValue(required(container.querySelector('#goal-status')), 'red'));
+    await flushAutoSave();
+    expect(savedGraph().items[0].status).toBe('red');
+    expect(savedGraph().items[0].goalCategory).toBe('Capability');
+    expect(savedGraph().items[0].description).toBe('');
+    expect(required(container.querySelector<HTMLTextAreaElement>('#item-description')).value).toBe(
+        'Unsubmitted draft'
+    );
+    act(() => changeValue(required(container.querySelector('#goal-target-date')), '2028-11'));
+    await flushAutoSave();
+    expect(savedGraph().items[0].targetDate).toBe('2028-11');
     await act(async () => {
-        Simulate.submit(required(container.querySelector('.details form')));
+        Simulate.submit(required(container.querySelector('#entry-edit-form')));
     });
 
     const updated = required(savedGraph().items.find((item) => item.id === 'created-entry'));
@@ -289,19 +301,16 @@ test('given a goal category, creating and changing it updates the list label and
     expect(typeFilter.querySelector('input[value="Capability"]')).not.toBeNull();
     expect(typeFilter.querySelector('input[value="Delivery"]')).not.toBeNull();
 
-    act(() => {
-        changeValue(required(container.querySelector('#goal-status')), '');
-        changeValue(required(container.querySelector('#goal-target-date')), '');
-    });
-    await act(async () => {
-        Simulate.submit(required(container.querySelector('.details form')));
-    });
+    act(() => changeValue(required(container.querySelector('#goal-status')), ''));
+    await flushAutoSave();
+    act(() => changeValue(required(container.querySelector('#goal-target-date')), ''));
+    await flushAutoSave();
     const cleared = required(savedGraph().items.find((item) => item.id === 'created-entry'));
     expect(cleared.status).toBeUndefined();
     expect(cleared.targetDate).toBeUndefined();
 });
 
-test('given a Jira-link, creating, replacing and clearing it only persist the issue ID when saved', async () => {
+test('given a Jira-link, creation and each later add or removal are autosaved', async () => {
     jest.useFakeTimers();
     try {
         await act(async () => {
@@ -348,7 +357,8 @@ test('given a Jira-link, creating, replacing and clearing it only persist the is
                 required(container.querySelector('[aria-label="Remove Jira link 10001"]'))
             )
         );
-        expect(savedGraph().items[0].jiraIssueIds).toEqual(['10001', '10002']);
+        await flushAutoSave();
+        expect(savedGraph().items[0].jiraIssueIds).toEqual(['10002']);
         act(() => changeValue(container.querySelector('#goal-jira-link'), 'DEMO-1'));
         await act(async () => {
             jest.advanceTimersByTime(250);
@@ -356,9 +366,7 @@ test('given a Jira-link, creating, replacing and clearing it only persist the is
         await act(async () =>
             Simulate.click(required(container.querySelector('.jira-issue-results button')))
         );
-        await act(async () =>
-            Simulate.submit(required(container.querySelector('#entry-edit-form')))
-        );
+        await flushAutoSave();
         expect(savedGraph().items[0].jiraIssueIds).toEqual(['10002', '10001']);
 
         await act(async () =>
@@ -380,18 +388,14 @@ test('given a Jira-link, creating, replacing and clearing it only persist the is
                 required(container.querySelector('[aria-label="Remove Jira link 10002"]'))
             )
         );
-        await act(async () =>
-            Simulate.submit(required(container.querySelector('#entry-edit-form')))
-        );
+        await flushAutoSave();
         expect(savedGraph().items[0].jiraIssueIds).toEqual(['10001']);
         act(() =>
             Simulate.click(
                 required(container.querySelector('[aria-label="Remove Jira link 10001"]'))
             )
         );
-        await act(async () =>
-            Simulate.submit(required(container.querySelector('#entry-edit-form')))
-        );
+        await flushAutoSave();
         expect(savedGraph().items[0].jiraIssueIds).toBeUndefined();
     } finally {
         jest.useRealTimers();
@@ -431,13 +435,55 @@ test('given an inaccessible Jira issue, unrelated edits preserve its link until 
     act(() =>
         Simulate.click(required(container.querySelector('[aria-label="Remove Jira link 90001"]')))
     );
-    await act(async () => Simulate.submit(required(container.querySelector('#entry-edit-form'))));
+    await flushAutoSave();
     expect(savedGraph().items[0].jiraIssueIds).toEqual(['90002']);
     act(() =>
         Simulate.click(required(container.querySelector('[aria-label="Remove Jira link 90002"]')))
     );
-    await act(async () => Simulate.submit(required(container.querySelector('#entry-edit-form'))));
+    await flushAutoSave();
     expect(savedGraph().items[0].jiraIssueIds).toBeUndefined();
+});
+
+test('given an assignee is added, it autosaves without saving an unrelated description draft', async () => {
+    jest.useFakeTimers();
+    try {
+        localStorage.setItem(
+            'compass-preview-v1',
+            JSON.stringify({
+                items: [entryFixture({ id: 'goal', type: 'goal', name: 'Assignee autosave' })],
+                labels: [],
+                updatedAt: null
+            })
+        );
+        await act(async () => ReactDOM.render(<App />, container));
+        act(() =>
+            Simulate.click(
+                required(container.querySelector('[aria-label="Open goal Assignee autosave"]'))
+            )
+        );
+        act(() =>
+            changeValue(required(container.querySelector('#item-description')), 'Draft text')
+        );
+        act(() => changeValue(required(container.querySelector('#edit-assignees')), 'Alex'));
+        await act(async () => {
+            jest.advanceTimersByTime(250);
+            await Promise.resolve();
+        });
+        await act(async () =>
+            Simulate.click(required(container.querySelector('.user-results button')))
+        );
+        await flushAutoSave();
+
+        expect(savedGraph().items[0].assignees).toEqual([
+            { accountId: 'preview-alex', displayName: 'Alex Morgan' }
+        ]);
+        expect(savedGraph().items[0].description).toBe('');
+        expect(
+            required(container.querySelector<HTMLTextAreaElement>('#item-description')).value
+        ).toBe('Draft text');
+    } finally {
+        jest.useRealTimers();
+    }
 });
 
 test('given an older Jira search completing late, it cannot replace the latest results', async () => {
@@ -2338,6 +2384,15 @@ async function selectImportFile(contents: string): Promise<void> {
 
 function savedGraph(): SavedGraph {
     return JSON.parse(required(localStorage.getItem('compass-preview-v1'))) as SavedGraph;
+}
+
+async function flushAutoSave(): Promise<void> {
+    await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+    });
 }
 
 function entryFixture(entry: Pick<WorkspaceEntry, 'id'> & Partial<WorkspaceEntry>): WorkspaceEntry {

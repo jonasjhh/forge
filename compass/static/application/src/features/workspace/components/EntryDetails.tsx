@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ArrowRight,
     Check,
@@ -34,6 +34,11 @@ const goalCategoryIcons = {
     Delivery: Rocket
 };
 
+function withoutAutoSavedFields(entry: WorkspaceEntry) {
+    const { assignees, status, targetDate, jiraIssueIds, ...otherFields } = entry;
+    return otherFields;
+}
+
 interface EntryDetailsProps {
     item: WorkspaceEntry;
     items: WorkspaceEntry[];
@@ -60,6 +65,10 @@ export default function EntryDetails({
 }: EntryDetailsProps) {
     const currentGroupId =
         items.find((entry) => entry.type === 'group' && entry.childIds.includes(item.id))?.id || '';
+    const previousItem = useRef(item);
+    const previousGroupId = useRef(currentGroupId);
+    const autoSaveBase = useRef(item);
+    const autoSaveQueue = useRef<Promise<boolean>>(Promise.resolve(true));
     const [groupId, setGroupId] = useState(currentGroupId);
     const [name, setName] = useState(item.name);
     const [description, setDescription] = useState(item.description);
@@ -77,6 +86,21 @@ export default function EntryDetails({
     const [target, setTarget] = useState('');
     const [parentTarget, setParentTarget] = useState('');
     useEffect(() => {
+        const onlyAutoSavedFieldsChanged =
+            previousItem.current.id === item.id &&
+            previousGroupId.current === currentGroupId &&
+            JSON.stringify(withoutAutoSavedFields(previousItem.current)) ===
+                JSON.stringify(withoutAutoSavedFields(item));
+        previousItem.current = item;
+        previousGroupId.current = currentGroupId;
+        autoSaveBase.current = item;
+        if (onlyAutoSavedFieldsChanged) {
+            setAssignees(item.assignees);
+            setStatus(item.status ?? '');
+            setTargetDate(item.targetDate ?? '');
+            setJiraIssueIds(item.jiraIssueIds ?? []);
+            return;
+        }
         setName(item.name);
         setDescription(item.description);
         setAssignees(item.assignees);
@@ -94,6 +118,14 @@ export default function EntryDetails({
         setParentTarget('');
         setGroupId(currentGroupId);
     }, [item, currentGroupId]);
+
+    function autoSaveFields(fields: Partial<WorkspaceEntry>): void {
+        if (busy) return;
+        const base = autoSaveBase.current.id === item.id ? autoSaveBase.current : item;
+        const updated = { ...base, ...fields };
+        autoSaveBase.current = updated;
+        autoSaveQueue.current = autoSaveQueue.current.then(() => saveEntry(updated));
+    }
 
     function onSave(updated: WorkspaceEntry): Promise<boolean> {
         return saveEntry(
@@ -220,7 +252,10 @@ export default function EntryDetails({
                             id="goal-status"
                             value={status}
                             disabled={busy}
-                            onChange={setStatus}
+                            onChange={(value) => {
+                                setStatus(value);
+                                autoSaveFields({ status: value || undefined });
+                            }}
                         />
                         <label htmlFor="goal-target-date">
                             Target month <span className="optional">optional</span>
@@ -230,7 +265,11 @@ export default function EntryDetails({
                             type="month"
                             value={targetDate}
                             disabled={busy}
-                            onChange={(event) => setTargetDate(event.target.value)}
+                            onChange={(event) => {
+                                const value = event.target.value;
+                                setTargetDate(value);
+                                autoSaveFields({ targetDate: value || undefined });
+                            }}
                         />
                         <label htmlFor="goal-group">Group</label>
                         <select
@@ -252,7 +291,10 @@ export default function EntryDetails({
                             key={item.id}
                             id="goal-jira-link"
                             value={jiraIssueIds}
-                            onChange={setJiraIssueIds}
+                            onChange={(value) => {
+                                setJiraIssueIds(value);
+                                autoSaveFields({ jiraIssueIds: value.length ? value : undefined });
+                            }}
                             disabled={busy}
                         />
                     </React.Fragment>
@@ -268,7 +310,10 @@ export default function EntryDetails({
                 {item.type !== 'group' && (
                     <AssigneePicker
                         value={assignees}
-                        onChange={setAssignees}
+                        onChange={(value) => {
+                            setAssignees(value);
+                            autoSaveFields({ assignees: value });
+                        }}
                         disabled={busy}
                         id="edit-assignees"
                     />
