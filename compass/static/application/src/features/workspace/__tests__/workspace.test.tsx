@@ -1002,7 +1002,17 @@ test('given the Cards tab, deliveries show only existing fields and related work
     act(() => Simulate.click(required(container.querySelector('[aria-label="Cards"]'))));
 
     const deliveryList = required(container.querySelector('[aria-label="Deliveries"]'));
+    expect(deliveryList.querySelectorAll('.delivery-list-item')).toHaveLength(1);
+    expect(deliveryList.textContent).not.toContain('Automate intake');
+    act(() =>
+        Simulate.click(
+            required(
+                container.querySelector('[aria-label="Expand delivery Improve digital process"]')
+            )
+        )
+    );
     expect(deliveryList.querySelectorAll('.delivery-list-item')).toHaveLength(2);
+    expect(deliveryList.querySelectorAll('.delivery-nav-root')).toHaveLength(1);
     expect(deliveryList.textContent).not.toContain('Decision: update workflow');
     expect(container.querySelector('.workspace-filters')).toBeNull();
     expect(container.querySelector('.workspace.has-selection')).toBeNull();
@@ -1076,7 +1086,17 @@ test('given the Cards tab, deliveries show only existing fields and related work
     expect(container.querySelector('.delivery-card')?.textContent).toContain(
         'Validate structured input'
     );
-    expect(container.querySelector('.delivery-card')?.textContent).toContain('20 / 70 %');
+    expect(container.querySelector('.delivery-metric-name')?.textContent).toBe('Completion rate');
+    expect(
+        [...container.querySelectorAll('.delivery-metric-values dt')].map(
+            (element) => element.textContent
+        )
+    ).toEqual(['Current', 'Target']);
+    expect(
+        [...container.querySelectorAll('.delivery-metric-values dd')].map(
+            (element) => element.textContent
+        )
+    ).toEqual(['20 %', '70 %']);
     expect(container.querySelector('.delivery-card')?.textContent).not.toContain('Status');
     expect(container.querySelector('.delivery-card')?.textContent).not.toContain('Risk');
     expect(container.querySelector('.delivery-card-data-grid')).not.toBeNull();
@@ -1130,6 +1150,138 @@ test('given the Cards tab, deliveries show only existing fields and related work
     expect(container.querySelector('.delivery-card-header h2')?.textContent).toBe(
         'Improve digital process'
     );
+    expect(savedGraph().items).toEqual(items);
+});
+
+test('given Cards with unset status and metrics, all labels remain visible and status can be set', async () => {
+    const labels = Array.from({ length: 8 }, (_, index) => ({
+        id: `metadata-${index}`,
+        name: `Important label ${index}`,
+        color: '#0c66e4'
+    }));
+    const items = [
+        entryFixture({
+            id: 'delivery',
+            type: 'goal',
+            name: 'Main delivery',
+            childIds: ['missing', 'zero', 'child'],
+            labelIds: labels.map((label) => label.id)
+        }),
+        entryFixture({ id: 'child', type: 'goal', name: 'Child delivery' }),
+        entryFixture({
+            id: 'missing',
+            type: 'metric',
+            name: 'Unmeasured metric',
+            currentValue: null,
+            targetValue: null,
+            unit: '%'
+        }),
+        entryFixture({
+            id: 'zero',
+            type: 'metric',
+            name: 'Measured metric',
+            currentValue: 0,
+            targetValue: 80,
+            unit: '%'
+        })
+    ];
+    localStorage.setItem('compass-preview-v1', JSON.stringify({ items, labels, updatedAt: null }));
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    act(() => Simulate.click(required(container.querySelector('[aria-label="Cards"]'))));
+    expect(container.querySelectorAll('.delivery-card-labels .workspace-label-chip')).toHaveLength(
+        8
+    );
+    expect(container.querySelectorAll('.delivery-metric-values .is-missing')).toHaveLength(2);
+    expect(
+        [...container.querySelectorAll('.delivery-metric-result:last-child dd')].map(
+            (element) => element.textContent
+        )
+    ).toEqual(['0 %', '80 %']);
+    const unset = required(
+        container.querySelector('.delivery-subgoal-card [data-status="undefined"]')
+    );
+    expect(unset.textContent).toBe('');
+    expect(unset.getAttribute('aria-label')).toBe('Status: Undefined');
+    expect(unset.getAttribute('title')).toContain('needs to be set');
+    act(() => Simulate.click(required(container.querySelector('.delivery-set-status'))));
+    expect(container.querySelector('[aria-label="List"]')?.getAttribute('aria-pressed')).toBe(
+        'true'
+    );
+    expect(required(container.querySelector<HTMLSelectElement>('#goal-status')).value).toBe('');
+    act(() => changeValue(required(container.querySelector('#goal-status')), 'green'));
+    await act(async () => {
+        Simulate.submit(required(container.querySelector('.details form')));
+    });
+    act(() => Simulate.click(required(container.querySelector('[aria-label="Cards"]'))));
+    expect(container.querySelector('.delivery-set-status')).toBeNull();
+    expect(container.querySelector('.delivery-card-header .goal-status-green')).not.toBeNull();
+    expect(container.querySelectorAll('.delivery-card-labels .workspace-label-chip')).toHaveLength(
+        8
+    );
+});
+
+test('given shared delivery branches, Cards navigation expands each path independently', async () => {
+    const items = [
+        entryFixture({ id: 'first', type: 'goal', name: 'First delivery', childIds: ['bridge'] }),
+        entryFixture({
+            id: 'bridge',
+            type: 'goal',
+            name: 'Capability bridge',
+            goalCategory: 'Capability',
+            childIds: ['shared']
+        }),
+        entryFixture({ id: 'second', type: 'goal', name: 'Second delivery', childIds: ['shared'] }),
+        entryFixture({ id: 'shared', type: 'goal', name: 'Shared delivery', childIds: ['leaf'] }),
+        entryFixture({ id: 'leaf', type: 'goal', name: 'Leaf delivery' })
+    ];
+    localStorage.setItem(
+        'compass-preview-v1',
+        JSON.stringify({ items, labels: [], updatedAt: null })
+    );
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    act(() => Simulate.click(required(container.querySelector('[aria-label="Cards"]'))));
+    expect(
+        [...container.querySelectorAll('.delivery-list-item')].map((button) => button.textContent)
+    ).toEqual(['First delivery', 'Second delivery']);
+    act(() =>
+        Simulate.click(
+            required(container.querySelector('[aria-label="Expand delivery First delivery"]'))
+        )
+    );
+    expect(
+        [...container.querySelectorAll('.delivery-list-item')].map((button) => button.textContent)
+    ).toEqual(['First delivery', 'Shared delivery', 'Second delivery']);
+    act(() =>
+        Simulate.click(
+            required(container.querySelector('[aria-label="Expand delivery Shared delivery"]'))
+        )
+    );
+    act(() =>
+        Simulate.click(
+            required(container.querySelector('[aria-label="Expand delivery Second delivery"]'))
+        )
+    );
+    expect(
+        [...container.querySelectorAll('.delivery-list-item')].map((button) => button.textContent)
+    ).toEqual([
+        'First delivery',
+        'Shared delivery',
+        'Leaf delivery',
+        'Second delivery',
+        'Shared delivery'
+    ]);
+    act(() =>
+        Simulate.click(
+            required(container.querySelector('[aria-label="Collapse delivery First delivery"]'))
+        )
+    );
+    expect(
+        [...container.querySelectorAll('.delivery-list-item')].map((button) => button.textContent)
+    ).toEqual(['First delivery', 'Second delivery', 'Shared delivery']);
     expect(savedGraph().items).toEqual(items);
 });
 

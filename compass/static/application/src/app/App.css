@@ -799,7 +799,38 @@
     display: grid;
     padding: 4px;
 }
+.delivery-nav-row {
+    display: flex;
+    align-items: flex-start;
+    min-width: 0;
+    padding-left: min(calc(var(--delivery-depth) * 14px), 56px);
+}
+.delivery-nav-root .delivery-list-item {
+    font-weight: 600;
+}
+.delivery-nav-toggle,
+.delivery-nav-spacer {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 24px;
+    width: 24px;
+    height: 36px;
+}
+.delivery-nav-toggle {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+}
+.delivery-nav-toggle:hover {
+    background: var(--subtle);
+}
+.delivery-nav-toggle[aria-expanded='true'] svg {
+    transform: rotate(90deg);
+}
 .delivery-list-item {
+    flex: 1;
     min-width: 0;
     padding: 9px 10px;
     border: 0;
@@ -854,6 +885,39 @@
 }
 .delivery-card-header-meta .delivery-card-eyebrow {
     margin: 0;
+}
+.delivery-card-status {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+.delivery-set-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 6px;
+    border: 1px solid #aebed0;
+    background: transparent;
+    color: #ffffff;
+    font-size: 11px;
+}
+.delivery-card[data-status='yellow'] .delivery-card-header {
+    border-top: 4px solid #d6ad2b;
+}
+.delivery-card[data-status='red'] .delivery-card-header {
+    border-top: 4px solid #e85d50;
+}
+.cards-view .goal-status-compact {
+    min-height: 20px;
+    width: 20px;
+    padding: 0;
+    background: transparent;
+    color: var(--muted);
+}
+.cards-view .goal-status-yellow {
+    color: #735600;
 }
 .goal-status-badge {
     display: inline-flex;
@@ -944,10 +1008,10 @@
     min-width: 0;
     min-height: 112px;
     padding: 10px 12px;
-    border: 1px solid color-mix(in srgb, var(--goal-category-color) 45%, white);
+    border: 1px solid color-mix(in srgb, var(--goal-category-color) 25%, white);
     border-top: 3px solid var(--goal-category-color);
     border-radius: 4px;
-    background: color-mix(in srgb, var(--goal-category-background) 48%, white);
+    background: color-mix(in srgb, var(--goal-category-background) 18%, white);
 }
 .delivery-goal-column h3 {
     margin-bottom: 9px;
@@ -977,6 +1041,20 @@
 .delivery-parent-card:hover {
     border-color: var(--goal-category-color, var(--blue));
     background: var(--goal-category-background, var(--subtle));
+}
+.delivery-subgoal-card[data-status='yellow'],
+.delivery-parent-card[data-status='yellow'] {
+    border-left: 3px solid #b38600;
+    background: #fffbed;
+}
+.delivery-subgoal-card[data-status='red'],
+.delivery-parent-card[data-status='red'] {
+    border-left: 3px solid #c9372c;
+    background: #fff5f4;
+}
+.delivery-subgoal-card[data-status='undefined'],
+.delivery-parent-card[data-status='undefined'] {
+    border-style: dashed;
 }
 .delivery-subgoal-name,
 .delivery-parent-name {
@@ -1042,14 +1120,45 @@
     overflow-wrap: anywhere;
 }
 .delivery-card-metrics li {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
+    display: grid;
+    gap: 10px;
 }
-.delivery-metric-value {
-    flex: none;
-    color: var(--muted);
+.delivery-metric-result + .delivery-metric-result {
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+}
+.delivery-metric-name {
+    font-size: 12px;
+    font-weight: 500;
+}
+.delivery-metric-values {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin: 0;
     font-variant-numeric: tabular-nums;
+}
+.delivery-metric-values > div {
+    min-width: 0;
+}
+.delivery-metric-values dt {
+    color: var(--muted);
+    font-size: 10px;
+}
+.delivery-metric-values dd {
+    margin: 3px 0 0;
+    font-size: 22px;
+    font-weight: 650;
+    overflow-wrap: anywhere;
+}
+.delivery-metric-values .is-missing {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 400;
+}
+.delivery-metric-unit {
+    font-size: 12px;
+    font-weight: 400;
 }
 .delivery-card-empty {
     display: grid;
@@ -1590,7 +1699,7 @@ select:focus {
         max-height: none;
     }
     .delivery-list-items {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: minmax(0, 1fr);
         align-items: start;
     }
     .delivery-card-content {

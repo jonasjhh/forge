@@ -588,6 +588,10 @@ function App() {
                             labels={labels}
                             selectedId={selectedCardId}
                             onSelect={setSelectedCardId}
+                            onEditGoal={(id) => {
+                                setSelectedId(id);
+                                setMode('list');
+                            }}
                         />
                     ) : mode === 'list' ? (
                         <div className="list-workspace">
