@@ -59,6 +59,32 @@ test('given a goal status, the graph preserves supported values and rejects unkn
     );
 });
 
+test('given a linked Jira issue, saving preserves its stable ID without adding issue metadata', () => {
+    const graph = validateGraph({
+        items: [{ ...item('goal', [], 'goal'), jiraIssueId: '10001' }]
+    });
+    assert.deepEqual(graph.items[0], { ...item('goal', [], 'goal'), jiraIssueId: '10001' });
+});
+
+test('given an invalid Jira link or a link on a non-goal, saving is rejected', () => {
+    assert.throws(
+        () => validateGraph({ items: [{ ...item('goal', [], 'goal'), jiraIssueId: 'LOV-123' }] }),
+        /numeric issue ID/
+    );
+    assert.throws(
+        () => validateGraph({ items: [{ ...item('goal', [], 'goal'), jiraIssueId: 10001 }] }),
+        /numeric issue ID/
+    );
+    assert.throws(
+        () => validateGraph({ items: [{ ...item('goal', [], 'goal'), jiraIssueId: '' }] }),
+        /numeric issue ID/
+    );
+    assert.throws(
+        () => validateGraph({ items: [{ ...item('group'), jiraIssueId: '10001' }] }),
+        /numeric issue ID/
+    );
+});
+
 test('given a goal target month, the graph stores a valid year and month', () => {
     const graph = validateGraph({
         items: [{ ...item('goal', [], 'goal'), targetDate: '2027-03' }]

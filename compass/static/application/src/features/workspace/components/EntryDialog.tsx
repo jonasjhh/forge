@@ -6,6 +6,7 @@ import LabelPicker from '../../../components/labels/LabelPicker';
 import MetricFields from './MetricFields';
 import type { MetricValues } from './MetricFields';
 import { GoalStatusField } from './GoalStatus';
+import JiraIssueField from './JiraIssueField';
 import { canContain, entryTypes, goalCategories } from '../model/entries';
 import type {
     Assignee,
@@ -54,6 +55,7 @@ export default function EntryDialog({
     const [goalCategory, setGoalCategory] = useState<GoalCategory>('Delivery');
     const [status, setStatus] = useState<GoalStatus | ''>('');
     const [targetDate, setTargetDate] = useState('');
+    const [jiraIssueId, setJiraIssueId] = useState<string>();
     const [metric, setMetric] = useState<MetricValues>({
         currentValue: 0,
         targetValue: 100,
@@ -100,7 +102,8 @@ export default function EntryDialog({
                                     ? {
                                           goalCategory,
                                           ...(status ? { status } : {}),
-                                          ...(targetDate ? { targetDate } : {})
+                                          ...(targetDate ? { targetDate } : {}),
+                                          ...(jiraIssueId ? { jiraIssueId } : {})
                                       }
                                     : {}),
                                 ...(type === 'metric' ? metric : {})
@@ -226,6 +229,14 @@ export default function EntryDialog({
                                 onChange={setAssignees}
                                 disabled={busy}
                                 id="new-assignees"
+                            />
+                        )}
+                        {type === 'goal' && (
+                            <JiraIssueField
+                                id="new-jira-link"
+                                value={jiraIssueId}
+                                onChange={setJiraIssueId}
+                                disabled={busy}
                             />
                         )}
                         <LabelPicker

@@ -31,6 +31,7 @@ const graph: Graph = {
             labelIds: ['team'],
             goalCategory: 'Decision',
             status: 'yellow',
+            jiraIssueId: '10001',
             targetDate: '2027-03'
         }
     ],
@@ -55,6 +56,10 @@ test.each([
     { ...graph.items[0], labelIds: ['unknown'] },
     { ...graph.items[0], targetDate: '2027-13' },
     { ...graph.items[0], status: 'blue' },
+    { ...graph.items[0], jiraIssueId: 'LOV-123' },
+    { ...graph.items[0], jiraIssueId: 10001 },
+    { ...graph.items[0], jiraIssueId: '' },
+    { ...graph.items[0], type: 'group', jiraIssueId: '10001' },
     { ...graph.items[0], name: 'x'.repeat(201) },
     { ...graph.items[0], type: 'unknown' },
     { ...graph.items[0], assignees: [{ displayName: 'Alice' }] }

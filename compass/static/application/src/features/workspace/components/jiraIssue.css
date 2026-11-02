@@ -1,0 +1,71 @@
+.jira-issue-field {
+    min-width: 0;
+    display: grid;
+    gap: 6px;
+}
+
+.jira-issue-field input {
+    width: 100%;
+    min-width: 0;
+}
+
+.jira-issue-selected {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.jira-issue-reference {
+    min-width: 0;
+    flex: 1;
+}
+
+.jira-issue-link,
+.jira-issue-results button {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    text-align: left;
+    overflow-wrap: anywhere;
+}
+
+.jira-issue-link {
+    color: var(--ds-link, #0c66e4);
+    font-size: 13px;
+}
+
+.jira-issue-link svg,
+.jira-issue-results svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.jira-issue-unavailable {
+    color: var(--ds-text-subtle, #626f86);
+    font-size: 12px;
+}
+
+.jira-issue-results {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid var(--ds-border, #dcdfe4);
+    border-radius: 4px;
+}
+
+.jira-issue-results button {
+    width: 100%;
+    border: 0;
+    border-radius: 0;
+    padding: 8px;
+    background: var(--ds-surface, #fff);
+    color: var(--ds-text, #172b4d);
+    cursor: pointer;
+}
+
+.jira-issue-results button:hover,
+.jira-issue-results button:focus-visible {
+    background: var(--ds-background-neutral-hovered, #e9ebee);
+}

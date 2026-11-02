@@ -3,6 +3,7 @@ import { ChevronRight, Pencil } from 'lucide-react';
 import AssigneeChip from '../../../components/assignees/AssigneeChip';
 import LabelChip from '../../../components/labels/LabelChip';
 import { GoalStatusBadge } from './GoalStatus';
+import { JiraIssueLink } from './JiraIssueField';
 import { goalCategoryStyles } from '../model/entries';
 import { formatTargetMonth } from '../model/targetMonth';
 import type { GoalCategory, WorkspaceEntry, WorkspaceLabel } from '../../../types/workspace';
@@ -294,6 +295,14 @@ export default function CardsView({
                                 </CardSection>
                             </div>
                         </div>
+                        {selected.jiraIssueId && (
+                            <CardSection title="Jira-link">
+                                <JiraIssueLink
+                                    key={selected.jiraIssueId}
+                                    issueId={selected.jiraIssueId}
+                                />
+                            </CardSection>
+                        )}
                         {selected.assignees.length > 0 && (
                             <CardSection title="Assignees">
                                 <div className="delivery-card-assignees">

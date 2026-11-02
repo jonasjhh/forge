@@ -87,6 +87,15 @@ export function validateGraph(payload: unknown): Graph {
         ) {
             throw new Error('Goal target dates must use the YYYY-MM format.');
         }
+        const jiraIssueId = item.jiraIssueId;
+        if (
+            jiraIssueId !== undefined &&
+            (type !== 'goal' ||
+                typeof jiraIssueId !== 'string' ||
+                !/^[1-9]\d{0,19}$/.test(jiraIssueId))
+        ) {
+            throw new Error('Jira links require a valid numeric issue ID on a goal.');
+        }
         const assignees = item.assignees ?? [];
         if (!Array.isArray(assignees) || assignees.length > 20) {
             throw new Error('Goals and metrics support up to 20 assignees.');
@@ -179,7 +188,8 @@ export function validateGraph(payload: unknown): Graph {
                 ? {
                       goalCategory: goalCategory as GoalCategory,
                       ...(status ? { status: status as GoalStatus } : {}),
-                      ...(targetDate ? { targetDate } : {})
+                      ...(targetDate ? { targetDate } : {}),
+                      ...(jiraIssueId ? { jiraIssueId: jiraIssueId as string } : {})
                   }
                 : {}),
             ...metric

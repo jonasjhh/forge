@@ -8,6 +8,8 @@ import GoalList from '../components/GoalList';
 import AssigneeChip from '../../../components/assignees/AssigneeChip';
 import { getUserAvatar } from '../../../services/jiraUsers';
 import * as jiraUsers from '../../../services/jiraUsers';
+import * as jiraIssues from '../../../services/jiraIssues';
+import JiraIssueField from '../components/JiraIssueField';
 import type { SavedGraph, WorkspaceEntry } from '../../../types/workspace';
 import {
     buildListRows,
@@ -296,6 +298,172 @@ test('given a goal category, creating and changing it updates the list label and
     const cleared = required(savedGraph().items.find((item) => item.id === 'created-entry'));
     expect(cleared.status).toBeUndefined();
     expect(cleared.targetDate).toBeUndefined();
+});
+
+test('given a Jira-link, creating, replacing and clearing it only persist the issue ID when saved', async () => {
+    jest.useFakeTimers();
+    try {
+        await act(async () => {
+            ReactDOM.render(<App />, container);
+        });
+        act(() =>
+            Simulate.click(
+                required(
+                    [
+                        ...container.querySelectorAll<HTMLButtonElement>('.header-actions button')
+                    ].find((button) => button.textContent?.includes('New goal'))
+                )
+            )
+        );
+        act(() => changeValue(container.querySelector('#new-name'), 'Linked goal'));
+        act(() => changeValue(container.querySelector('#new-jira-link'), 'DEMO-1'));
+        await act(async () => {
+            jest.advanceTimersByTime(250);
+        });
+        await act(async () =>
+            Simulate.click(required(container.querySelector('.jira-issue-results button')))
+        );
+        expect(localStorage.getItem('compass-preview-v1')).toBeNull();
+        await act(async () => Simulate.submit(required(container.querySelector('dialog form'))));
+        expect(savedGraph().items[0].jiraIssueId).toBe('10001');
+        expect(JSON.stringify(savedGraph())).not.toContain('DEMO-1');
+        expect(JSON.stringify(savedGraph())).not.toContain('Preview:');
+
+        await act(async () =>
+            Simulate.click(
+                required(container.querySelector('[aria-label="Open goal Linked goal"]'))
+            )
+        );
+        expect(container.querySelector('.jira-issue-link')?.textContent).toContain('DEMO-1');
+        act(() =>
+            Simulate.click(required(container.querySelector('[aria-label="Remove Jira link"]')))
+        );
+        expect(savedGraph().items[0].jiraIssueId).toBe('10001');
+        act(() => changeValue(container.querySelector('#goal-jira-link'), 'DEMO-2'));
+        await act(async () => {
+            jest.advanceTimersByTime(250);
+        });
+        await act(async () =>
+            Simulate.click(required(container.querySelector('.jira-issue-results button')))
+        );
+        await act(async () =>
+            Simulate.submit(required(container.querySelector('#entry-edit-form')))
+        );
+        expect(savedGraph().items[0].jiraIssueId).toBe('10002');
+
+        await act(async () =>
+            Simulate.click(required(container.querySelector('[aria-label="Cards"]')))
+        );
+        expect(container.querySelector('.delivery-card .jira-issue-link')?.textContent).toContain(
+            'DEMO-2'
+        );
+        const open = jest.spyOn(jiraIssues, 'openIssue').mockResolvedValue(undefined);
+        await act(async () =>
+            Simulate.click(required(container.querySelector('.jira-issue-link')))
+        );
+        expect(open).toHaveBeenCalledWith('DEMO-2');
+
+        act(() => Simulate.click(required(container.querySelector('[aria-label="List"]'))));
+        act(() =>
+            Simulate.click(required(container.querySelector('[aria-label="Remove Jira link"]')))
+        );
+        await act(async () =>
+            Simulate.submit(required(container.querySelector('#entry-edit-form')))
+        );
+        expect(savedGraph().items[0].jiraIssueId).toBeUndefined();
+    } finally {
+        jest.useRealTimers();
+    }
+});
+
+test('given an inaccessible Jira issue, unrelated edits preserve its link until explicitly removed', async () => {
+    localStorage.setItem(
+        'compass-preview-v1',
+        JSON.stringify({
+            items: [
+                entryFixture({
+                    id: 'goal',
+                    type: 'goal',
+                    name: 'Restricted link',
+                    jiraIssueId: '90001'
+                })
+            ],
+            labels: [],
+            updatedAt: null
+        })
+    );
+    await act(async () => {
+        ReactDOM.render(<App />, container);
+    });
+    await act(async () =>
+        Simulate.click(
+            required(container.querySelector('[aria-label="Open goal Restricted link"]'))
+        )
+    );
+    expect(container.querySelector('.jira-issue-unavailable')?.textContent).toContain(
+        'unavailable or inaccessible'
+    );
+    act(() => changeValue(container.querySelector('#item-description'), 'Updated description'));
+    await act(async () => Simulate.submit(required(container.querySelector('#entry-edit-form'))));
+    expect(savedGraph().items[0].jiraIssueId).toBe('90001');
+    act(() => Simulate.click(required(container.querySelector('[aria-label="Remove Jira link"]'))));
+    await act(async () => Simulate.submit(required(container.querySelector('#entry-edit-form'))));
+    expect(savedGraph().items[0].jiraIssueId).toBeUndefined();
+});
+
+test('given an older Jira search completing late, it cannot replace the latest results', async () => {
+    jest.useFakeTimers();
+    try {
+        let completeOldSearch: (issues: jiraIssues.JiraIssue[]) => void = () => {};
+        jest.spyOn(jiraIssues, 'searchIssues')
+            .mockImplementationOnce(
+                () =>
+                    new Promise((resolve) => {
+                        completeOldSearch = resolve;
+                    })
+            )
+            .mockResolvedValueOnce([{ id: '10002', key: 'DEMO-2', summary: 'Latest result' }]);
+        act(() => {
+            ReactDOM.render(<JiraIssueField id="test-jira" onChange={() => {}} />, container);
+        });
+        act(() => changeValue(container.querySelector('#test-jira'), 'old'));
+        await act(async () => {
+            jest.advanceTimersByTime(250);
+        });
+        act(() => changeValue(container.querySelector('#test-jira'), 'latest'));
+        await act(async () => {
+            jest.advanceTimersByTime(250);
+        });
+        await act(async () => {
+            completeOldSearch([{ id: '10001', key: 'OLD-1', summary: 'Stale result' }]);
+        });
+        expect(container.querySelector('.jira-issue-results')?.textContent).toContain(
+            'Latest result'
+        );
+        expect(container.querySelector('.jira-issue-results')?.textContent).not.toContain(
+            'Stale result'
+        );
+    } finally {
+        jest.useRealTimers();
+    }
+});
+
+test('given a failed Jira search, the field shows an error rather than reporting no matches', async () => {
+    jest.useFakeTimers();
+    try {
+        jest.spyOn(jiraIssues, 'searchIssues').mockRejectedValueOnce(new Error('Forbidden'));
+        act(() => {
+            ReactDOM.render(<JiraIssueField id="test-jira" onChange={() => {}} />, container);
+        });
+        act(() => changeValue(container.querySelector('#test-jira'), 'LOV'));
+        await act(async () => {
+            jest.advanceTimersByTime(250);
+        });
+        expect(container.querySelector('[role="alert"]')?.textContent).toContain('app permissions');
+        expect(container.textContent).not.toContain('No matching Jira issues');
+    } finally {
+        jest.useRealTimers();
+    }
 });
 
 test('given an open edit sidebar, closing it clears selection and allows reopening', async () => {

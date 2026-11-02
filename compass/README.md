@@ -89,6 +89,14 @@ Refresh the workspace to load other users' changes; updates are not pushed live.
 
 Export downloads the entire loaded workspace as a JSON file containing `items` and `labels`, regardless of active filters or collapsed branches. IDs, child ordering, shared parent connections, assignees, goal categories, and metric values are preserved. Import accepts the same format, validates fields and relationships, and asks for confirmation before replacing all current entries, connections, and labels in a single save. Invalid files and canceled imports do not write data. Import uses the normal workspace limits and rejects files larger than 1 MB; export a backup before replacing shared data. Save timestamps and editor metadata are regenerated on import.
 
+## Jira Links
+
+Each goal can optionally link to one Jira issue. Search by key or title in the goal's Jira-link field, then save the goal. The selected issue's key and title open the issue in Jira; the same link is shown in Cards. Removing the link takes effect when the goal is saved and does not change the Jira issue.
+
+Only the stable `jiraIssueId` is stored and exported. Issue keys and summaries are resolved live as the current Jira user and are not copied into the shared workspace. Deleted or inaccessible issues show an unavailable state without deleting the association. Search and lookup require the user's Jira issue permissions. The app additionally requires `read:jira-work`: deploy and upgrade the installation to approve this scope before using Jira links.
+
+JSON export/import preserves issue IDs, not issue metadata or Jira issues themselves. IDs belong to the originating Jira site; imports into another site do not remap them. Local preview offers only clearly marked `DEMO-1` and `DEMO-2` sample issues.
+
 ## Local Development
 
 From `compass/`:

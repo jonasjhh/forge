@@ -18,6 +18,7 @@ import LabelPicker from '../../../components/labels/LabelPicker';
 import LabelChip from '../../../components/labels/LabelChip';
 import MetricFields from './MetricFields';
 import { GoalStatusField } from './GoalStatus';
+import JiraIssueField from './JiraIssueField';
 import { canConnect, entryTypes, goalCategories } from '../model/entries';
 import type {
     EntryType,
@@ -67,6 +68,7 @@ export default function EntryDetails({
     const [goalCategory, setGoalCategory] = useState<GoalCategory>(item.goalCategory ?? 'Delivery');
     const [status, setStatus] = useState<GoalStatus | ''>(item.status ?? '');
     const [targetDate, setTargetDate] = useState(item.targetDate ?? '');
+    const [jiraIssueId, setJiraIssueId] = useState(item.jiraIssueId);
     const [metric, setMetric] = useState({
         currentValue: item.currentValue ?? null,
         targetValue: item.targetValue ?? null,
@@ -82,6 +84,7 @@ export default function EntryDetails({
         setGoalCategory(item.goalCategory ?? 'Delivery');
         setStatus(item.status ?? '');
         setTargetDate(item.targetDate ?? '');
+        setJiraIssueId(item.jiraIssueId);
         setMetric({
             currentValue: item.currentValue ?? null,
             targetValue: item.targetValue ?? null,
@@ -118,7 +121,8 @@ export default function EntryDetails({
             ? {
                   goalCategory,
                   status: status || undefined,
-                  targetDate: targetDate || undefined
+                  targetDate: targetDate || undefined,
+                  jiraIssueId
               }
             : {}),
         ...(item.type === 'metric' ? metric : {})
@@ -244,6 +248,13 @@ export default function EntryDetails({
                                     </option>
                                 ))}
                         </select>
+                        <JiraIssueField
+                            key={item.id}
+                            id="goal-jira-link"
+                            value={jiraIssueId}
+                            onChange={setJiraIssueId}
+                            disabled={busy}
+                        />
                     </React.Fragment>
                 )}
                 {item.type === 'metric' && (
